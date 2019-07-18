@@ -2,18 +2,16 @@
 import pandas as pd
 from pandas.io import gbq
 from google.cloud import bigquery
+from google.oauth2 import service_account
+from google.cloud import langauge
 
-client = bigquery.Client()
-
-import plotly.plotly as pt
-import plotly.graph_objs as go
-import plotly.figure_factory as ff
-
-project_id = "playproject-247013"
+credentials = service_account.Credentials.from_service_account_file("/Users/elijahrou/Google Drive/iX/BTC_Blockchain_Analysis/bigquery_service_key.json")
+project_id = "ethereum-data-exploration"
+client = bigquery.Client(project = project_id, credentials=credentials)
 
 top10_active_users_query = """
 SELECT
-  author AS User,
+  DATEPART,
   count(author) as Stories
 FROM
   [fh-bigquery:hackernews.stories]
@@ -30,7 +28,4 @@ try:
 except:
     print("Error reading the dataset")
 
-top_10_users_table = ff.create_table(top10_active_users_df)
-print(top10_active_users_df.head())
-pt.plot(top_10_users_table, filename='top-10-active-users')
 
