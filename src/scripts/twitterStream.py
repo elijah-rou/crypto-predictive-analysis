@@ -47,17 +47,28 @@ def textCleaner(textText):
     return newText
 
 
-# Function to filter text for spam and nonsense
+# Function to filter text for spam, duplicates and nonsense
 def spamFilter(tweetText):
     # Use NLTK to remove non-english words and stop-words
     words = tweetText.split()
     newText = ""
+    orderedWords = set()
 
-    # Check if the word is a stop word and is a proper word
+    # Check if the word is a duplicate and a stop word or a proper word
     for w in words:
-        if (not w in stopWords) or (w in engCorpus):
+        if (word not in orderedWords) and ((not w in stopWords) or (w in engCorpus)):
+            orderedWords.add(word)
             newText = newText + " " + w
     return newText
+
+
+# Function to dump relevant parts of the tweet to a mongo database
+# TODO
+#def dumpTweet(tweet):
+#    try:
+#    
+#    except:
+
 
 
 # Classes
