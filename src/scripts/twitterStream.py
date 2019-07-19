@@ -15,6 +15,8 @@ import nltk
 from nltk.corpus import stopwords
 from nltk.corpus import words
 from nltk.tokenize import word_tokenize
+# Postgres Library
+import psycopg2
 
 
 
@@ -33,7 +35,6 @@ consumerSecret = "iH9hlwQvrdzKhkwd1RzSiAhEUjnRltgYihR1n5YPO6FkOY81k9"
 
 # Function to clean tweet text (Remove whitespace, convert to lowercase, remove non-alphabetic characters)
 def textCleaner(textText):
-
     # Convert text to lowercase
     newText = tweetText.lower()
 
@@ -49,10 +50,10 @@ def textCleaner(textText):
 
 # Function to filter text for spam and nonsense
 def spamFilter(tweetText):
-
     # Use NLTK to remove non-english words and stop-words
     words = tweetText.split()
     newText = ""
+
     # Check if the word is a stop word and is a proper word
     for w in words:
         if (not w in stopWords) or (w in engCorpus):
@@ -90,11 +91,15 @@ class BitcoinListener(StreamListener):
             # Replace tweet data
             tweet["text"] = text
 
+            ## TODO
+            ## Store the tweet data in either a file or a database
+            ## (only <id, timestamp, text>)
+
+
+
 
 # Main Function
 def main():
-
-    # Open a new JSON file
     # Set up a stream listener
     btcListener = BitcoinListener()
 
