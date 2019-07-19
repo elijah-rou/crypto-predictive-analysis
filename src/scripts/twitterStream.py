@@ -15,9 +15,8 @@ import nltk
 from nltk.corpus import stopwords
 from nltk.corpus import words
 from nltk.tokenize import word_tokenize
-# Postgres Library
-import psycopg2
-
+# MongoDB Library
+import pymongo
 
 
 # Constants
