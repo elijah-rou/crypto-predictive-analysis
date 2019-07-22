@@ -16,13 +16,18 @@ from nltk.corpus import stopwords
 from nltk.corpus import words
 from nltk.tokenize import word_tokenize
 # MongoDB Library
-import pymongo
+from pymongo import MongoClient
+# Python thread class
+import _thread
 
 
 # Constants
 keywords = ["bitcoin"]
 stopWords = set(stopwords.words("english"))
 engCorpus = set(words.words())
+
+# MongoDB @ 192.168.2.69:27017
+client = MongoClient("192.168.2.69", 27017)
 
 # Define acess tokens & user credentials used for access
 accessToken = "1152134174108782592-qEFou1vhM61EI4tnUjzZRNsfeq8Enq"
@@ -67,47 +72,40 @@ def spamFilter(tweetText):
 # TODO
 #def dumpTweet(tweet):
 #    try:
-#    
+    
 #    except:
 
 
+# Function that cleans a tweet and stores it in a MongoDB database
+def cleanAndStore(tweet, id):
+    # Ignore retweets
+    if tweet["retweeted"] == False:
+        # Check if the tweet uses extended text
+        # If tweet is extended use that format else use normal format
+        print("Cleaning tweet: " + id)
+        if "extended_text" in tweet:
+            text = tweet["extended_tweet"]["full_text"]
+            tweet["text"] = text
 
-# Classes
-# override tweepy.StreamListener
-class BitcoinListener(StreamListener):
+        else:
+            text = tweet["text"]
+        print(text)
 
-    # OVERRIDE on_status
-    def on_status(self, statusCode):
-        print("Status: " + str(statusCode))
+        # Clean and Filter data from tweet
+        text = textCleaner(text)
+        text = spamFilter(text)
 
-    # OVERRIDE on_error
-    def on_error(self, statusCode):
-        print("Error: " + str(statusCode))
+        # If meaningful - remove unnecessary key-values
+        if text != '':
+            # Refactor important values
 
-        # If status is 420 error disconnect stream
-        if statusCode == 420:
-            return False
+            ## TODO
+            ## STORE HASHTAGS
+            tweet.pop("extended_tweet")
 
-    # OVERRIDE on_data
-    def on_data(self, data):
-        tweet = json.loads(data)
-        id = tweet["id_str"]
-        print("Receiving tweet " + id)
-        # Ignore retweets (for now)
-        if tweet["retweeted"] == False:
-            if "extended_text" in tweet:
-                text = tweet["extended_tweet"]
-            else:
-                text = tweet["text"]
-            
-            print(text)
-            # Clean and Filter data from tweet
-            text = textCleaner(text)
-            text = spamFilter(text)
-            
-            # Remove unnecessary key-values
             tweet.pop("in_reply_to_status_id")
             tweet.pop("in_reply_to_user_id_str")
+            tweet.pop("in_reply_to_user_id")
             tweet.pop("coordinates")
             tweet.pop("contributors")
             tweet.pop("in_reply_to_status_id_str")
@@ -150,23 +148,54 @@ class BitcoinListener(StreamListener):
             tweet["user"].pop("profile_sidebar_fill_color")
             tweet["user"].pop("profile_background_color")
             tweet["user"].pop("time_zone")
+            tweet["user"].pop("lang")
+            tweet["user"].pop("contributors_enabled")
+            tweet["user"].pop("is_translator")
+            tweet["user"].pop("profile_background_image_url_https")
+            tweet["user"].pop("profile_use_background_image")
+            
 
             if "entities" in tweet["user"]:
                 tweet["user"].pop("entities")
             
+            # Add cleaned tweet data
+            tweet["cleaned_text"] = text
+            # Save tweet
+            # TODO SAVE TO MONGO
+            file = open("data/twitter/" + tweet["id_str"] + ".json", "w+")
+            file.write(json.dumps(tweet)) 
+            print("Saved " + id + ".\n")
+        else:
+            print("ERROR 2: Tweet id=" + id + " has no meaningful info. Ignoring...")
+    else:
+        print("ERROR 1: Tweet id=" + id + " is a retweet. Ignoring...")
 
-            if text != '':
-                # Add cleaned tweet data
-                tweet["cleaned_text"] = text
-
-                ## TODO
-                ## Store the tweet data in either a file or a database
-                ## (only <id, timestamp, text>)
-                file = open("data/twitter/" + tweet["id_str"] + ".json", "w+")
-                file.write(json.dumps(tweet)) 
-                print("Saved " + id + ".\n")
 
 
+
+# Classes
+# override tweepy.StreamListener
+class BitcoinListener(StreamListener):
+
+    # OVERRIDE on_status
+    def on_status(self, statusCode):
+        print("Status: " + str(statusCode))
+
+    # OVERRIDE on_error
+    def on_error(self, statusCode):
+        print("Error: " + str(statusCode))
+
+        # If status is 420 error disconnect stream
+        if statusCode == 420:
+            return False
+
+    # OVERRIDE on_data
+    def on_data(self, data):
+        tweet = json.loads(data)
+        id = tweet["id_str"]
+        print("Receiving tweet " + id)
+        # Start a new thread that processes the tweet
+        _thread.start_new_thread(cleanAndStore, (tweet, id))
 
 
 # Main Function
