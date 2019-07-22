@@ -95,12 +95,16 @@ class BitcoinListener(StreamListener):
         print("Receiving tweet " + id)
         # Ignore retweets (for now)
         if tweet["retweeted"] == False:
-            text = tweet["text"]
+            if "extended_text" in tweet:
+                text = tweet["extended_tweet"]
+            else:
+                text = tweet["text"]
+            
             print(text)
             # Clean and Filter data from tweet
             text = textCleaner(text)
             text = spamFilter(text)
-            """
+            
             # Remove unnecessary key-values
             tweet.pop("in_reply_to_status_id")
             tweet.pop("in_reply_to_user_id_str")
@@ -113,15 +117,17 @@ class BitcoinListener(StreamListener):
             tweet.pop("truncated")
             tweet.pop("in_reply_to_screen_name")
             tweet.pop("is_quote_status")
-            #tweet.pop("extended_entities")
             tweet.pop("lang")
+            if "extended_entities" in tweet:
+                tweet.pop("extended_entities")
             
             # From "entities" key
-            #tweet["entities"].pop("media")
-            tweet["entities"].pop("urls")
-            tweet["entities"].pop("symbols")
-            tweet["entities"].pop("user_mentions")
-
+            if "entities" in tweet:
+                tweet.pop("entities")
+                # tweet["entities"].pop("media")
+                # tweet["entities"].pop("urls")
+                # tweet["entities"].pop("symbols")
+                # tweet["entities"].pop("user_mentions")
 
             # From "user" key
             tweet["user"].pop("default_profile")
@@ -130,22 +136,24 @@ class BitcoinListener(StreamListener):
             tweet["user"].pop("name")
             tweet["user"].pop("description")
             tweet["user"].pop("profile_sidebar_border_color")
-            #tweet["user"].pop("entities")
             tweet["user"].pop("utc_offset")
             tweet["user"].pop("notifications")
-            #tweet["user"].pop("profile_background_image_url")
+            tweet["user"].pop("profile_background_image_url")
             tweet["user"].pop("profile_image_url")
             tweet["user"].pop("profile_image_url_https")
             tweet["user"].pop("follow_request_sent")
             tweet["user"].pop("url")
-            tweet["user"].pop("profile_background_image_url")
             tweet["user"].pop("profile_link_color")
             tweet["user"].pop("profile_text_color")
-            tweet["user"].pop("profile_banner_url")
+            if "profile_banner_url" in tweet["user"]:
+                tweet["user"].pop("profile_banner_url")
             tweet["user"].pop("profile_sidebar_fill_color")
             tweet["user"].pop("profile_background_color")
             tweet["user"].pop("time_zone")
-            """
+
+            if "entities" in tweet["user"]:
+                tweet["user"].pop("entities")
+            
 
             if text != '':
                 # Add cleaned tweet data
