@@ -33,7 +33,7 @@ consumerSecret = "iH9hlwQvrdzKhkwd1RzSiAhEUjnRltgYihR1n5YPO6FkOY81k9"
 # Functions
 
 # Function to clean tweet text (Remove whitespace, convert to lowercase, remove non-alphabetic characters)
-def textCleaner(textText):
+def textCleaner(tweetText):
     # Convert text to lowercase
     newText = tweetText.lower()
 
@@ -42,7 +42,7 @@ def textCleaner(textText):
 
     # Remove all non-alphabetic characters using regular expression
     regex = re.compile("[^a-zA-Z]")
-    newText = regex.sub("", newText)
+    newText = regex.sub(" ", newText)
     
     return newText
 
@@ -54,12 +54,13 @@ def spamFilter(tweetText):
     newText = ""
     orderedWords = set()
 
-    # Check if the word is a duplicate and a stop word or a proper word
+    # Check if the word is a duplicate, and a stop word or a proper word
     for w in words:
-        if (word not in orderedWords) and ((not w in stopWords) or (w in engCorpus)):
-            orderedWords.add(word)
-            newText = newText + " " + w
-    return newText
+        if (w not in orderedWords) and (w not in stopWords) and (w in engCorpus) and (len(w) > 1):
+            print(w)
+            orderedWords.add(w)
+            newText = newText + "," + w
+    return newText[1:]
 
 
 # Function to dump relevant parts of the tweet to a mongo database
@@ -90,20 +91,72 @@ class BitcoinListener(StreamListener):
     # OVERRIDE on_data
     def on_data(self, data):
         tweet = json.loads(data)
-        # Ignore retweets
+        id = tweet["id_str"]
+        print("Receiving tweet " + id)
+        # Ignore retweets (for now)
         if tweet["retweeted"] == False:
             text = tweet["text"]
-            
+            print(text)
             # Clean and Filter data from tweet
             text = textCleaner(text)
             text = spamFilter(text)
+            """
+            # Remove unnecessary key-values
+            tweet.pop("in_reply_to_status_id")
+            tweet.pop("in_reply_to_user_id_str")
+            tweet.pop("coordinates")
+            tweet.pop("contributors")
+            tweet.pop("in_reply_to_status_id_str")
+            tweet.pop("source")
+            tweet.pop("place")
+            tweet.pop("geo")
+            tweet.pop("truncated")
+            tweet.pop("in_reply_to_screen_name")
+            tweet.pop("is_quote_status")
+            #tweet.pop("extended_entities")
+            tweet.pop("lang")
+            
+            # From "entities" key
+            #tweet["entities"].pop("media")
+            tweet["entities"].pop("urls")
+            tweet["entities"].pop("symbols")
+            tweet["entities"].pop("user_mentions")
 
-            # Replace tweet data
-            tweet["text"] = text
 
-            ## TODO
-            ## Store the tweet data in either a file or a database
-            ## (only <id, timestamp, text>)
+            # From "user" key
+            tweet["user"].pop("default_profile")
+            tweet["user"].pop("profile_background_tile")
+            tweet["user"].pop("following")
+            tweet["user"].pop("name")
+            tweet["user"].pop("description")
+            tweet["user"].pop("profile_sidebar_border_color")
+            #tweet["user"].pop("entities")
+            tweet["user"].pop("utc_offset")
+            tweet["user"].pop("notifications")
+            #tweet["user"].pop("profile_background_image_url")
+            tweet["user"].pop("profile_image_url")
+            tweet["user"].pop("profile_image_url_https")
+            tweet["user"].pop("follow_request_sent")
+            tweet["user"].pop("url")
+            tweet["user"].pop("profile_background_image_url")
+            tweet["user"].pop("profile_link_color")
+            tweet["user"].pop("profile_text_color")
+            tweet["user"].pop("profile_banner_url")
+            tweet["user"].pop("profile_sidebar_fill_color")
+            tweet["user"].pop("profile_background_color")
+            tweet["user"].pop("time_zone")
+            """
+
+            if text != '':
+                # Add cleaned tweet data
+                tweet["cleaned_text"] = text
+
+                ## TODO
+                ## Store the tweet data in either a file or a database
+                ## (only <id, timestamp, text>)
+                file = open("data/twitter/" + tweet["id_str"] + ".json", "w+")
+                file.write(json.dumps(tweet)) 
+                print("Saved " + id + ".\n")
 
 
 
