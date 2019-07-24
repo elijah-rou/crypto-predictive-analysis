@@ -6,7 +6,7 @@ from google.oauth2 import service_account
 
 
 
-credentials = service_account.Credentials.from_service_account_file("/Users/elijahrou/Google Drive/iX/BTC_Blockchain_Analysis/bigquery_service_key.json")
+credentials = service_account.Credentials.from_service_account_file("/Users/elijahrou/Google Drive/iX/BTC_Blockchain_Analysis/src/scripts/bigquery/bigquery_service_key.json")
 project_id = "ethereum-data-exploration"
 client = bigquery.Client(project = project_id, credentials=credentials)
 
