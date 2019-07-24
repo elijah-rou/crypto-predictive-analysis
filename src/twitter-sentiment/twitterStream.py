@@ -22,12 +22,14 @@ import _thread
 
 
 # Constants
-keywords = ["bitcoin"]
+keywords = ["bitcoin", "ethereum", "cryptocurrency", "btc", "crypto", "eth", "blockchain"]
 stopWords = set(stopwords.words("english"))
 engCorpus = set(words.words())
 
 # MongoDB @ 192.168.2.69:27017
 client = MongoClient("192.168.2.69", 27017)
+db = client["sentiment_data"]
+twitterData = db.twitter
 
 # Define acess tokens & user credentials used for access
 accessToken = "1152134174108782592-qEFou1vhM61EI4tnUjzZRNsfeq8Enq"
@@ -86,6 +88,7 @@ def cleanAndStore(tweet, id):
         if "extended_text" in tweet:
             text = tweet["extended_tweet"]["full_text"]
             tweet["text"] = text
+            tweet.pop("extended_tweet")
 
         else:
             text = tweet["text"]
@@ -98,14 +101,18 @@ def cleanAndStore(tweet, id):
         # If meaningful - remove unnecessary key-values
         if text != '':
             # Refactor important values
+            tweet["tweet_id"] = tweet.pop("id")
 
             ## TODO
             ## STORE HASHTAGS
-            tweet.pop("extended_tweet")
 
+            # Remove unecessary attributes
+            tweet.pop("id_str")
             tweet.pop("in_reply_to_status_id")
             tweet.pop("in_reply_to_user_id_str")
             tweet.pop("in_reply_to_user_id")
+            if "display_text_range" in tweet:
+                tweet.pop("display_text_range")
             tweet.pop("coordinates")
             tweet.pop("contributors")
             tweet.pop("in_reply_to_status_id_str")
@@ -161,9 +168,10 @@ def cleanAndStore(tweet, id):
             # Add cleaned tweet data
             tweet["cleaned_text"] = text
             # Save tweet
-            # TODO SAVE TO MONGO
-            file = open("data/twitter/" + tweet["id_str"] + ".json", "w+")
-            file.write(json.dumps(tweet, indent=2)) 
+            #file = open("data/twitter/" + tweet["id_str"] + ".json", "w+")
+            #file.write(json.dumps(tweet, indent=2))
+            result = twitterData.insert_one(tweet)
+            print('Posted: {0}'.format(result.inserted_id)) 
             print("Saved " + id + ".\n")
         else:
             print("ERROR 2: Tweet id=" + id + " has no meaningful info. Ignoring...")
