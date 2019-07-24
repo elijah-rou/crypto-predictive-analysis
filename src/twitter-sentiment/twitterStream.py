@@ -31,7 +31,7 @@ client = MongoClient("192.168.2.69", 27017)
 db = client["sentiment_data"]
 twitterData = db.twitter
 
-# Define acess tokens & user credentials used for access
+# Define access tokens & user credentials used for access
 accessToken = "1152134174108782592-qEFou1vhM61EI4tnUjzZRNsfeq8Enq"
 accessSecret = "89d5n5V0mviJeJyXdKirjKTLDKVAa6hbeKbUuM3SXX9Yq"
 consumerKey = "LIrUnrnifiXrTaiuTmalM30Pd"
@@ -70,14 +70,6 @@ def spamFilter(tweetText):
     return newText[1:]
 
 
-# Function to dump relevant parts of the tweet to a mongo database
-# TODO
-#def dumpTweet(tweet):
-#    try:
-    
-#    except:
-
-
 # Function that cleans a tweet and stores it in a MongoDB database
 def cleanAndStore(tweet, id):
     # Ignore retweets
@@ -98,7 +90,7 @@ def cleanAndStore(tweet, id):
         text = textCleaner(text)
         text = spamFilter(text)
 
-        # If meaningful - remove unnecessary key-values
+        # If meaningful -> Continue with processing
         if text != '':
             # Refactor important values
             tweet["tweet_id"] = tweet.pop("id")
@@ -168,8 +160,6 @@ def cleanAndStore(tweet, id):
             # Add cleaned tweet data
             tweet["cleaned_text"] = text
             # Save tweet
-            #file = open("data/twitter/" + tweet["id_str"] + ".json", "w+")
-            #file.write(json.dumps(tweet, indent=2))
             result = twitterData.insert_one(tweet)
             print('Posted: {0}'.format(result.inserted_id)) 
             print("Saved " + id + ".\n")
@@ -216,7 +206,7 @@ def main():
     authentication.set_access_token(accessToken, accessSecret)
     stream = Stream(authentication, btcListener ,tweet_mode = "extended")
 
-    # Filter steam by keywords
+    # Filter stream by keywords
     stream.filter(languages = ["en"], track = keywords, is_async = True)
 
 if __name__ == "__main__": main()
