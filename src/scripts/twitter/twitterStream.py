@@ -163,7 +163,7 @@ def cleanAndStore(tweet, id):
             # Save tweet
             # TODO SAVE TO MONGO
             file = open("data/twitter/" + tweet["id_str"] + ".json", "w+")
-            file.write(json.dumps(tweet)) 
+            file.write(json.dumps(tweet, indent=2)) 
             print("Saved " + id + ".\n")
         else:
             print("ERROR 2: Tweet id=" + id + " has no meaningful info. Ignoring...")
