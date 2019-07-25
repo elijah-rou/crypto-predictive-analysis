@@ -170,7 +170,6 @@ def cleanAndStore(tweet, id):
 
 
 
-
 # Classes
 # override tweepy.StreamListener
 class BitcoinListener(StreamListener):
@@ -204,7 +203,7 @@ def main():
     # Set up stream
     authentication = OAuthHandler(consumerKey, consumerSecret)
     authentication.set_access_token(accessToken, accessSecret)
-    stream = Stream(authentication, btcListener ,tweet_mode = "extended")
+    stream = Stream(authentication, btcListener, tweet_mode = "extended")
 
     # Filter stream by keywords
     stream.filter(languages = ["en"], track = keywords, is_async = True)
