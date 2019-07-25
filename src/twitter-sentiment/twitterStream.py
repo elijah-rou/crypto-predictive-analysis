@@ -188,13 +188,32 @@ class BitcoinListener(StreamListener):
 
         # If status is 420 error disconnect stream
         if statusCode == 420:
+            print("Making too many requests; Rate Limited")
             return False
+        if statusCode == 429:
+            print("Request cannot be served due to rate limit.")
+            return False
+        if statusCode == 500:
+            print("Internal Error")
+            return False
+        if statusCode == 502:
+            print("Twitter is down")
+            return False
+        if statusCode == 503:
+            print("Service is unavailable")
+            return False
+
 
     # OVERRIDE on_data
     def on_data(self, data):
         #print("Receiving tweet " + id)
         # Start a new thread that processes the tweet
         _thread.start_new_thread(cleanAndStore, (data))
+    
+    # OVERRIDE on_exception
+    def on_exception(self, exception):
+        print(exception)
+        return 
 
 
 # Main Function
@@ -208,6 +227,21 @@ def main():
     stream = Stream(authentication, btcListener, tweet_mode = "extended")
 
     # Filter stream by keywords
-    stream.filter(languages = ["en"], track = keywords, is_async = True, stall_warnings = True)
+    # If stream error, wait for a bit, then try again
+    while(true):
+        try:
+            stream.filter(languages = ["en"], track = keywords, is_async = True, stall_warnings = True)
+        except urllib3.exceptions.ProtocolError as error:
+            print_error(_error=error)
+        except ConnectionResetError as error:
+            print_error(_error=error)
+        except ConnectionError as error:
+            print_error(_error=error)
+        except requests.exceptions.ConnectionError as error:
+            print_error(_error=error)
+        except:
+            print("Unknown error. Halting for 5 minutes...")
+            sleep(3000)
+
 
 if __name__ == "__main__": main()
