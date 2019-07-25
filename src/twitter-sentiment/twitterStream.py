@@ -19,6 +19,8 @@ from nltk.tokenize import word_tokenize
 from pymongo import MongoClient
 # Python thread class
 import _thread
+# Thread sleeping
+from time import sleep
 
 
 # Constants
@@ -65,7 +67,7 @@ def spamFilter(tweetText):
     # Check if the word is a duplicate, and a stop word or a proper word
     for w in words:
         if (w not in orderedWords) and (w not in stopWords) and (w in engCorpus) and (len(w) > 1):
-            print(w)
+            #print(w)
             orderedWords.add(w)
             newText = newText + "," + w
     return newText[1:]
@@ -208,11 +210,13 @@ class BitcoinListener(StreamListener):
     def on_data(self, data):
         #print("Receiving tweet " + id)
         # Start a new thread that processes the tweet
-        _thread.start_new_thread(cleanAndStore, (data))
+        _thread.start_new_thread(cleanAndStore, (data,))
     
     # OVERRIDE on_exception
     def on_exception(self, exception):
         print(exception)
+        print("Stream encountered a problem. Sleeping for 5 minutes")
+        sleep(3000)
         return 
 
 
@@ -228,18 +232,7 @@ def main():
 
     # Filter stream by keywords
     # If stream error, wait for a bit, then try again
-    while(True):
-        try:
-            stream.filter(languages = ["en"], track = keywords, is_async = True, stall_warnings = True)
-        except ConnectionResetError as error:
-            print_error(_error=error)
-        except ConnectionError as error:
-            print_error(_error=error)
-        except requests.exceptions.ConnectionError as error:
-            print_error(_error=error)
-        except:
-            print("Unknown error. Halting for 5 minutes...")
-            sleep(3000)
 
+    stream.filter(languages = ["en"], track = keywords, is_async = True, stall_warnings = True)
 
 if __name__ == "__main__": main()
