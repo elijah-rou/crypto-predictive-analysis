@@ -231,8 +231,6 @@ def main():
     while(True):
         try:
             stream.filter(languages = ["en"], track = keywords, is_async = True, stall_warnings = True)
-        except urllib3.exceptions.ProtocolError as error:
-            print_error(_error=error)
         except ConnectionResetError as error:
             print_error(_error=error)
         except ConnectionError as error:
