@@ -228,7 +228,7 @@ def main():
 
     # Filter stream by keywords
     # If stream error, wait for a bit, then try again
-    while(true):
+    while(True):
         try:
             stream.filter(languages = ["en"], track = keywords, is_async = True, stall_warnings = True)
         except urllib3.exceptions.ProtocolError as error:
