@@ -31,7 +31,7 @@ keywords = ["bitcoin", "ethereum", "cryptocurrency", "btc", "crypto", "eth", "bl
 stopWords = set(stopwords.words("english"))
 engCorpus = set(words.words())
 # Tweet counter
-count = 0
+#count = 0
 multiplier = 1
 
 # MongoDB @ 192.168.2.69:27017
@@ -218,12 +218,12 @@ class BitcoinListener(StreamListener):
     def on_data(self, data):
         #print("Receiving tweet " + id)
         # Start a new thread that processes the tweet
-        count = count + 1
-        if(count == 500):
-            count = 0
-            log.write("Processed " + str(500*multiplier) + "tweets.")
-            log.write(twitterData.count_documents({}))
-            multiplier += 1
+        #count = count + 1
+        #if(count == 500):
+        #    count = 0
+        #    log.write("Processed " + str(500*multiplier) + "tweets.")
+        #    log.write(twitterData.count_documents({}))
+        #    multiplier += 1
         thread.start_new_thread(cleanAndStore, (data,))
     
     # OVERRIDE on_exception
