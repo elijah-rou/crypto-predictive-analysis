@@ -23,6 +23,7 @@ import _thread
 
 # Constants
 keywords = ["bitcoin", "ethereum", "cryptocurrency", "btc", "crypto", "eth", "blockchain"]
+# cryptonews, bitcoin, bitcoinmining, hodl, sell bitcion, buy bitcoin, bitcoin whale, bitcoin moooning
 stopWords = set(stopwords.words("english"))
 engCorpus = set(words.words())
 
