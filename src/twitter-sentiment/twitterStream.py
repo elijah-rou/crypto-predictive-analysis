@@ -72,12 +72,15 @@ def spamFilter(tweetText):
 
 
 # Function that cleans a tweet and stores it in a MongoDB database
-def cleanAndStore(tweet, id):
+def cleanAndStore(data):
+    # Load data into JSON
+    tweet = json.loads(data)
+    id = tweet["id_str"]
     # Ignore retweets
     if tweet["retweeted"] == False:
         # Check if the tweet uses extended text
         # If tweet is extended use that format else use normal format
-        print("Cleaning tweet: " + id)
+        #print("Cleaning tweet: " + id)
         if "extended_text" in tweet:
             text = tweet["extended_tweet"]["full_text"]
             tweet["text"] = text
@@ -85,7 +88,7 @@ def cleanAndStore(tweet, id):
 
         else:
             text = tweet["text"]
-        print(text)
+        #print(text)
 
         # Clean and Filter data from tweet
         text = textCleaner(text)
@@ -162,8 +165,8 @@ def cleanAndStore(tweet, id):
             tweet["cleaned_text"] = text
             # Save tweet
             result = twitterData.insert_one(tweet)
-            print('Posted: {0}'.format(result.inserted_id)) 
-            print("Saved " + id + ".\n")
+            #print('Posted: {0}'.format(result.inserted_id)) 
+            #print("Saved " + id + ".\n")
         else:
             print("ERROR 2: Tweet id=" + id + " has no meaningful info. Ignoring...")
     else:
@@ -189,11 +192,9 @@ class BitcoinListener(StreamListener):
 
     # OVERRIDE on_data
     def on_data(self, data):
-        tweet = json.loads(data)
-        id = tweet["id_str"]
-        print("Receiving tweet " + id)
+        #print("Receiving tweet " + id)
         # Start a new thread that processes the tweet
-        _thread.start_new_thread(cleanAndStore, (tweet, id))
+        _thread.start_new_thread(cleanAndStore, (data))
 
 
 # Main Function
@@ -207,6 +208,6 @@ def main():
     stream = Stream(authentication, btcListener, tweet_mode = "extended")
 
     # Filter stream by keywords
-    stream.filter(languages = ["en"], track = keywords, is_async = True)
+    stream.filter(languages = ["en"], track = keywords, is_async = True, stall_warnings = True)
 
 if __name__ == "__main__": main()
