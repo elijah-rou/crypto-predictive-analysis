@@ -435,8 +435,8 @@ tweets_hodl2 = twitteR::searchTwitter('bitcoin HODL -filter:retweets',lang = "en
 
 #Only looking at most recent tweets from t-15mins
 hodl2_tweets <- twListToDF(tweets_hodl2)
-hodl12_tweets$current <- ifelse(hodl12_tweets$created > time2, 1, 0)
-hodl12_current <- filter(hodl12_tweets, current == 1)
+hodl2_tweets$current <- ifelse(hodl2_tweets$created > time2, 1, 0)
+hodl2_current <- filter(hodl2_tweets, current == 1)
 
 hodl2_text   <- hodl2_current$text
 hodl2_text   <- tolower(hodl2_text)
@@ -823,27 +823,27 @@ Sentimentscores_bb<-cbind("sentiment"=rownames(Sentimentscores_bb),Sentimentscor
 rownames(Sentimentscores_bb)<-NULL
 
 #hodl2_text
-mysentiment_hodl2 <- get_nrc_sentiment((hodl2_text))
-Sentimentscores_hodl2 <-data.frame(colSums(mysentiment_hodl2[,]))
+mysentiment_hodl2     <- get_nrc_sentiment((hodl2_text))
+Sentimentscores_hodl2 <- data.frame(colSums(mysentiment_hodl2[,]))
 
-names(Sentimentscores_hodl2)<-"Score"
-Sentimentscores_hodl2<-cbind("sentiment"=rownames(Sentimentscores_hodl2),Sentimentscores_hodl2)
+names(Sentimentscores_hodl2) <- "Score"
+Sentimentscores_hodl2        <- cbind("sentiment"=rownames(Sentimentscores_hodl2),Sentimentscores_hodl2)
 rownames(Sentimentscores_hodl2)<-NULL
 
 #whale_text
-mysentiment_whale <- get_nrc_sentiment((whale_text))
+mysentiment_whale     <- get_nrc_sentiment((whale_text))
 Sentimentscores_whale <-data.frame(colSums(mysentiment_whale[,]))
 
-names(Sentimentscores_whale)<-"Score"
-Sentimentscores_whale<-cbind("sentiment"=rownames(Sentimentscores_whale),Sentimentscores_whale)
+names(Sentimentscores_whale) <- "Score"
+Sentimentscores_whale        <- cbind("sentiment"=rownames(Sentimentscores_whale),Sentimentscores_whale)
 rownames(Sentimentscores_whale)<-NULL
 
 #moon_text
 mysentiment_moon <- get_nrc_sentiment((moon_text))
 Sentimentscores_moon <-data.frame(colSums(mysentiment_moon[,]))
 
-names(Sentimentscores_moon)<-"Score"
-Sentimentscores_moon<-cbind("sentiment"=rownames(Sentimentscores_moon),Sentimentscores_moon)
+names(Sentimentscores_moon) <- "Score"
+Sentimentscores_moon        <- cbind("sentiment"=rownames(Sentimentscores_moon),Sentimentscores_moon)
 rownames(Sentimentscores_moon)<-NULL
 
 
@@ -876,9 +876,9 @@ SentMoon    <- as_tibble(Sentimentscores_moon %>% spread('sentiment','Score'))
 
 SentBit     <- as.matrix(SentBit)
 SentFud     <- as.matrix(SentBlock)
-SentBtc     <- as.matrix(SentCurrency)
-SentCC      <- as.matrix(SentCrypto)
-SentCcur    <- as.matrix(SentBitcoin)
+SentBtc     <- as.matrix(SentBtc)
+SentCC      <- as.matrix(SentCC)
+SentCcur    <- as.matrix(SentCcur)
 SentBlock   <- as.matrix(SentBlock)
 SentEther   <- as.matrix(SentEther)
 SentETH     <- as.matrix(SentETH)
@@ -920,9 +920,8 @@ colnames(MonsterData)[colnames(MonsterData)=="V1"] <- "Percent_Change"
 MonsterVal   <-read_json(path = "/Users/gordonjohnson/Desktop/DataScience/crypto-predictive-analysis/data/twitter/Monster_Data.json", simplifyVector = TRUE)
 MonsterVal   <- as_tibble(MonsterVal)
 Monster_file <- rbind(MonsterVal, MonsterData)
+
 write_json(MonsterData, path = "/Users/gordonjohnson/Desktop/DataScience/crypto-predictive-analysis/data/twitter/Monster_Data.json")
-
-
 
 
 
