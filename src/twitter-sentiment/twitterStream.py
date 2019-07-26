@@ -24,7 +24,7 @@ from time import sleep
 # Time for logging
 import datetime
 # Botometer for bot detection
-import botometer
+#import botometer
 
 
 # Constants
