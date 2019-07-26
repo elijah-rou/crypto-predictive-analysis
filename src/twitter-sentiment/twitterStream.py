@@ -26,13 +26,11 @@ import datetime
 
 
 # Constants
-keywords = ["bitcoin", "ethereum", "cryptocurrency", "btc", "crypto", "eth", "blockchain"]
+keywords = ["bitcoin", "ethereum", "cryptocurrency", "btc", "crypto", "eth", "blockchain", "bitcoin+news", "crypto+news", "hodl", "bitcoin+fud",
+"#bitcoin", "#bitcoinnews", "#cryptonews", "#crypto"]
 # cryptonews, bitcoin, bitcoinmining, hodl, sell bitcion, buy bitcoin, bitcoin whale, bitcoin moooning
 stopWords = set(stopwords.words("english"))
 engCorpus = set(words.words())
-# Tweet counter
-#count = 0
-multiplier = 1
 
 # MongoDB @ 192.168.2.69:27017
 client = MongoClient("192.168.2.69", 27017)
@@ -44,9 +42,6 @@ accessToken = "1152134174108782592-qEFou1vhM61EI4tnUjzZRNsfeq8Enq"
 accessSecret = "89d5n5V0mviJeJyXdKirjKTLDKVAa6hbeKbUuM3SXX9Yq"
 consumerKey = "LIrUnrnifiXrTaiuTmalM30Pd"
 consumerSecret = "iH9hlwQvrdzKhkwd1RzSiAhEUjnRltgYihR1n5YPO6FkOY81k9"
-
-# Open log file
-log = open("logs/twitter_stream.log", "w+")
 
 
 # Functions
@@ -90,12 +85,11 @@ def cleanAndStore(data):
     if tweet["retweeted"] == False:
         # Check if the tweet uses extended text
         # If tweet is extended use that format else use normal format
-        print("RECIEVING: " + id)
+        print(str(datetime.datetime.now()) + ": " + "RECIEVING: " + id)
         if "extended_text" in tweet:
             text = tweet["extended_tweet"]["full_text"]
             tweet["text"] = text
             tweet.pop("extended_tweet")
-
         else:
             text = tweet["text"]
         #print(text)
@@ -175,7 +169,7 @@ def cleanAndStore(data):
             tweet["cleaned_text"] = text
             # Save tweet
             result = twitterData.insert_one(tweet)
-            print(id + ' POSTED as {0}'.format(result.inserted_id)) 
+            print(str(datetime.datetime.now()) + ": " + id + ' POSTED as {0}'.format(result.inserted_id))
         else:
             print("ERROR 2: Tweet id=" + id + " has no meaningful info. Ignoring...")
     else:
@@ -194,7 +188,7 @@ class BitcoinListener(StreamListener):
     # OVERRIDE on_error
     def on_error(self, statusCode):
         print("Error: " + str(statusCode))
-        log.write(str(datetime.datetime.now()) +" - Error: " + str(statusCode) +"\n")
+        print(str(datetime.datetime.now()) +" - Error: " + str(statusCode) +"\n")
         
         # If status is 420 error disconnect stream
         if statusCode == 420:
@@ -216,22 +210,14 @@ class BitcoinListener(StreamListener):
 
     # OVERRIDE on_data
     def on_data(self, data):
-        #print("Receiving tweet " + id)
+        _thread.start_new_thread(cleanAndStore, (data,))
         # Start a new thread that processes the tweet
-        #count = count + 1
-        #if(count == 500):
-        #    count = 0
-        #    log.write("Processed " + str(500*multiplier) + "tweets.")
-        #    log.write(twitterData.count_documents({}))
-        #    multiplier += 1
-        thread.start_new_thread(cleanAndStore, (data,))
     
     # OVERRIDE on_exception
     # If stream error, wait for 5 minutes
     def on_exception(self, exception):
         print(exception)
-        log.write(str(datetime.datetime.now()) +" - Exception: " + str(exception) +"\n")
-        log.write("Restarting stream in 5 minutes")
+        print(str(datetime.datetime.now()) +" - Exception: " + str(exception) +"\n")
         print("Stream encountered a problem. Sleeping for 5 minutes")
         sleep(3000)
         return 
@@ -241,8 +227,6 @@ class BitcoinListener(StreamListener):
 def main():
     # Set up a stream listener
     btcListener = BitcoinListener()
-
-
 
     # Set up stream
     authentication = OAuthHandler(consumerKey, consumerSecret)
