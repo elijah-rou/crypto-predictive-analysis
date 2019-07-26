@@ -50,8 +50,8 @@ twitterAuth = {
 }
 
 # Botometer API key
-botAPIKey = "cd3f38366emshdd2cd0a2a5cca9ep14172djsn5f6c4df5a085"
-bom = botometer.Botometer(wait_on_rate_limit = True, mashape_key = botAPIKey, **twitterAuth)
+#botAPIKey = "cd3f38366emshdd2cd0a2a5cca9ep14172djsn5f6c4df5a085"
+#bom = botometer.Botometer(wait_on_rate_limit = True, mashape_key = botAPIKey, **twitterAuth)
 
 
 # Functions
