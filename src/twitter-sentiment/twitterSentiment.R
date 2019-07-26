@@ -14,15 +14,19 @@ library("cronR")
 library("miniUI")
 library("shiny")
 library("shinyFiles")
+library("mongolite")
+library("cryptor")
+library("zoo")
 
 # Set up twitter API credentials
-consumer_key2    <-"BfIYQbVQAuGAVpOKa0ldIrYgw"
-consumer_secret2 <-"WARBBW6SuT5AkUi4oqIFKmbq2yzAXRBaEgBUtjZVVefjY1KjZC"
-access_token2    <-"1148924254966226945-oGPaCVuMZxHTW46hEI3bjNGLI4UTA4"
-access_secret2   <-"34WP9hbA2xs8VGkGMigR0Ubk8Q0lGFLiB0jCnUBZbye0R"
+consumer_key    <-"BfIYQbVQAuGAVpOKa0ldIrYgw"
+consumer_secret <-"WARBBW6SuT5AkUi4oqIFKmbq2yzAXRBaEgBUtjZVVefjY1KjZC"
+access_token    <-"1148924254966226945-oGPaCVuMZxHTW46hEI3bjNGLI4UTA4"
+access_secret   <-"34WP9hbA2xs8VGkGMigR0Ubk8Q0lGFLiB0jCnUBZbye0R"
 
 # Twitter Authentication
 setup_twitter_oauth(consumer_key2, consumer_secret2, access_token2, access_secret2)
+
 
 # Functions
 # Function to search twitter and return the text of the tweets associated with the phrase
@@ -55,8 +59,19 @@ updateJson <- function(fileName, newData){
 }
 
 # Calculate the sentiment for a collection of tweets and output a matrix
-calculateSentiment <- function(tweetData){
+calculateSentimentNRC <- function(tweetData){
     sentimentScores <- get_nrc_sentiment(tweetData)
+    sentimentScores <- data.frame(colSums(sentimentScores[,]))
+    names(sentimentScores) <- "Score"
+    sentimentScores<-cbind("sentiment"=rownames(sentimentScores), sentimentScores)
+    rownames(sentimentScores) <- NULL
+    sentimentMatrix <- as_tibble(sentimentScores %>% spread("sentiment","Score")) %>% as.matrix
+    return(sentimentMatrix)
+}
+
+
+calculateSentiment <- function(tweetData){
+    sentimentScores <- get_sentiment(tweetData)
     sentimentScores <- data.frame(colSums(sentimentScores[,]))
     names(sentimentScores) <- "Score"
     sentimentScores<-cbind("sentiment"=rownames(sentimentScores), sentimentScores)
@@ -113,3 +128,53 @@ colnames(combinedData)[colnames(combinedData)=="BTC_Price$price_usd"] <- "Price_
 colnames(combinedData)[colnames(combinedData)=="V1"] <- "Percent_Change"
 
 updateJson("sentimentData.json", combinedData)
+
+########### With Mongo
+# Connect to MongoDB database
+tweets <-mongo(collection = "twitter", db = "sentiment_data", url="mongodb://192.168.2.69:27017")
+
+# Fetch all tweets
+all_tweets <- tweets$find("{}") %>% as.data.frame
+
+# Create a column of Time object values
+all_tweets$time_created <- as.POSIXct(all_tweets$time, 'UTC')
+
+first_10k <- tweets$find("{}", limit=10000) %>% as.data.frame
+#first_10k$time_lt <- strptime(first_10k$time, format = "%Y-%m-%d %H:%M:%S")
+first_10k$time_created <- as.POSIXct(first_10k$time, 'UTC')
+
+df <- cbind(first_10k$time, first_10k$time_created, first_10k$time_lt, first_10k$cleaned_text,  first_10k$text, first_10k$tweet_id) %>% as.data.frame
+colnames(df)[colnames(df) == "V1"] <- "time"
+colnames(df)[colnames(df) == "V2"] <- "timestamp"
+#colnames(df)[colnames(df) == "V3"] <- "time_as_POSIX"
+colnames(df)[colnames(df) == "V3"] <- "cleaned_text"
+colnames(df)[colnames(df) == "V4"] <- "text"
+colnames(df)[colnames(df) == "V5"] <- "tweet_id"
+
+cleaned_text <- gsub(",", " ", df$cleaned_text) 
+twitter_text <- df$text %>%
+        tolower %>%
+        gsub("rt", "", .) %>%
+        gsub("@\\w+", "", .) %>%
+        gsub("[[:punct:]]", "", .) %>%
+        gsub("http\\w+", "", .) %>%
+        gsub("[ |\t]{2,}", "", .) %>%
+        gsub("^ ", "", .) %>%
+        gsub(" $", "", .)
+df$score_with_clean <- as.list(get_sentiment(cleaned_text))
+#df$score_raw <- as.list(get_sentiment(twitter_text))
+
+df_2 <- df[!duplicated(df[,c('text')]),]
+df_2$minute <- minute(df_2$time)
+df_2$hour <- hour(df_2$time)
+df_2$day <- day(df_2$time)
+
+
+aggregate(df_2$score_with_clean, by = list(df_2$minute, df_2$hour, df_2$day), FUN = sum)
+
+
+final <- df_2 %>%
+    group_by(minute, hour, day)
+    #summarize(n())
+    #summarise(sum_score = mean(score_with_clean))
+
