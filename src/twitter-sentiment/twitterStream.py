@@ -85,6 +85,8 @@ def spamFilter(tweetText):
             newText = newText + "," + w
     return newText[1:]
 
+# Function that queries the botometer api to return a score
+# of how likely the account is to be a bot
 def botCheck(username_id):
     result = bom.check_account("username_id")
     score = result["scores"]["english"]
@@ -93,6 +95,29 @@ def botCheck(username_id):
         return False
     else:
         return True
+
+# Dictionary used to convert a month string JAN/FEB etc. to a number
+monthNum ={
+    "Jan" : "01",
+    "Feb" : "02",
+    "Mar" : "03",
+    "Apr" : "04",
+    "May" : "05",
+    "Jun" : "06",
+    "Jul" : "07",
+    "Aug" : "08",
+    "Sep" : "09",
+    "Oct" : "10",
+    "Nov" : "11",
+    "Dec" : "12"
+}
+
+# Used to convert a twitter created_at value to a UTC timestamp
+def toTimestamp(date):
+    timestamp = date[-4:]+"-"
+    timestamp += monthNum[date[4:7]]+"-"+date[8:10]+" "
+    timestamp += date[11:19]
+    return(timestamp)
 
 
 
@@ -188,6 +213,10 @@ def cleanAndStore(data):
             
             # Add cleaned tweet data
             tweet["cleaned_text"] = text
+
+            # Reformat created_at key-value to a workable timestamp
+            tweet["time"] = toTimestamp(tweet["created_at"])
+
             # Save tweet
             result = twitterData.insert_one(tweet)
             print(str(datetime.datetime.now()) + ": " + id + ' POSTED as {0}'.format(result.inserted_id))
