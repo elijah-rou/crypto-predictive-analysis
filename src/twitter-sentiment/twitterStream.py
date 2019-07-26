@@ -23,6 +23,8 @@ import _thread
 from time import sleep
 # Time for logging
 import datetime
+# Botometer for bot detection
+import botometer
 
 
 # Constants
@@ -32,16 +34,24 @@ keywords = ["bitcoin", "ethereum", "cryptocurrency", "btc", "crypto", "eth", "bl
 stopWords = set(stopwords.words("english"))
 engCorpus = set(words.words())
 
+
+
 # MongoDB @ 192.168.2.69:27017
 client = MongoClient("192.168.2.69", 27017)
 db = client["sentiment_data"]
 twitterData = db.twitter
 
 # Define access tokens & user credentials used for access
-accessToken = "1152134174108782592-qEFou1vhM61EI4tnUjzZRNsfeq8Enq"
-accessSecret = "89d5n5V0mviJeJyXdKirjKTLDKVAa6hbeKbUuM3SXX9Yq"
-consumerKey = "LIrUnrnifiXrTaiuTmalM30Pd"
-consumerSecret = "iH9hlwQvrdzKhkwd1RzSiAhEUjnRltgYihR1n5YPO6FkOY81k9"
+twitterAuth = {
+    "consumer_key" : "LIrUnrnifiXrTaiuTmalM30Pd",
+    "consumer_secret": "iH9hlwQvrdzKhkwd1RzSiAhEUjnRltgYihR1n5YPO6FkOY81k9",
+    "access_token" : "1152134174108782592-qEFou1vhM61EI4tnUjzZRNsfeq8Enq",
+    "access_secret" : "89d5n5V0mviJeJyXdKirjKTLDKVAa6hbeKbUuM3SXX9Yq"
+}
+
+# Botometer API key
+botAPIKey = "cd3f38366emshdd2cd0a2a5cca9ep14172djsn5f6c4df5a085"
+bom = botometer.Botometer(wait_on_rate_limit = True, mashape_key = botAPIKey, **twitterAuth)
 
 
 # Functions
@@ -75,6 +85,16 @@ def spamFilter(tweetText):
             newText = newText + "," + w
     return newText[1:]
 
+def botCheck(username_id):
+    result = bom.check_account("username_id")
+    score = result["scores"]["english"]
+    # False if likely to be human
+    if(score > 0.3):
+        return False
+    else:
+        return True
+
+
 
 # Function that cleans a tweet and stores it in a MongoDB database
 def cleanAndStore(data):
@@ -82,7 +102,8 @@ def cleanAndStore(data):
     tweet = json.loads(data)
     id = tweet["id_str"]
     # Ignore retweets
-    if tweet["retweeted"] == False:
+    #if tweet["retweeted"] == False and not botCheck(tweet["user"]["id"]):
+    if tweet["retweeted"] == False: 
         # Check if the tweet uses extended text
         # If tweet is extended use that format else use normal format
         print(str(datetime.datetime.now()) + ": " + "RECIEVING: " + id)
@@ -229,8 +250,8 @@ def main():
     btcListener = BitcoinListener()
 
     # Set up stream
-    authentication = OAuthHandler(consumerKey, consumerSecret)
-    authentication.set_access_token(accessToken, accessSecret)
+    authentication = OAuthHandler(twitterAuth["consumer_key"], twitterAuth["consumer_secret"])
+    authentication.set_access_token(twitterAuth["access_token"], twitterAuth["access_secret"])
     stream = Stream(authentication, btcListener, tweet_mode = "extended")
 
     # Filter stream by keywords
