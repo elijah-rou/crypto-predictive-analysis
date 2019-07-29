@@ -225,7 +225,7 @@ def cleanAndStore(data):
             tweet["sentiment_clean"] = analyzer.polarity_scores(tweet["cleaned_text"]) 
 
             # Save tweet & update user
-            user = doc["user"]
+            user = tweet["user"]
             user.pop("id_str")
             user.pop("translator_type")
             user["time"] = toTimestamp(user["created_at"])
