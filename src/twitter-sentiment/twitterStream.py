@@ -128,7 +128,7 @@ def cleanAndStore(data):
     id = tweet["id_str"]
     # Ignore retweets
     #if tweet["retweeted"] == False and not botCheck(tweet["user"]["id"]):
-    if tweet["retweeted"] == False: 
+    if tweet["retweeted"] == False and tweet["text"][0:2] != "RT": 
         # Check if the tweet uses extended text
         # If tweet is extended use that format else use normal format
         print(str(datetime.datetime.now()) + ": " + "RECIEVING: " + id)
