@@ -39,6 +39,7 @@ engCorpus = set(words.words())
 client = MongoClient("192.168.2.69", 27017)
 db = client["sentiment_data"]
 twitterData = db.twitter
+twitterUsers = db.twitter_users
 
 # Define access tokens & user credentials used for access
 twitterAuth = {
@@ -223,9 +224,15 @@ def cleanAndStore(data):
             tweet["sentiment"] = analyzer.polarity_scores(tweet["text"])
             tweet["sentiment_clean"] = analyzer.polarity_scores(tweet["cleaned_text"]) 
 
-            # Save tweet
+            # Save tweet & update user
+            user = doc["user"]
+            user.pop("id_str")
+            user.pop("translator_type")
+            user["time"] = toTimestamp(user["created_at"])
+            twitterUsers.update_one({"id": user["id"]},{"$set": user}, upsert  = True)
             result = twitterData.insert_one(tweet)
             print(str(datetime.datetime.now()) + ": " + id + ' POSTED as {0}'.format(result.inserted_id))
+            
         else:
             print("ERROR 2: Tweet id=" + id + " has no meaningful info. Ignoring...")
     else:
