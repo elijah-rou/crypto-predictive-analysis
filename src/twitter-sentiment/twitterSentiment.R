@@ -25,7 +25,7 @@ access_token    <-"1148924254966226945-oGPaCVuMZxHTW46hEI3bjNGLI4UTA4"
 access_secret   <-"34WP9hbA2xs8VGkGMigR0Ubk8Q0lGFLiB0jCnUBZbye0R"
 
 # Twitter Authentication
-setup_twitter_oauth(consumer_key2, consumer_secret2, access_token2, access_secret2)
+setup_twitter_oauth(consumer_key, consumer_secret, access_token, access_secret)
 
 
 # Functions
@@ -134,12 +134,19 @@ updateJson("sentimentData.json", combinedData)
 tweets <-mongo(collection = "twitter", db = "sentiment_data", url="mongodb://192.168.2.69:27017")
 
 # Fetch all tweets
-all_tweets <- tweets$find("{}") %>% as.data.frame
+all_tweets <- tweets$find("{}", limit = 1) %>% as.data.frame
+
+all_tweets <- tweets$find(query = '{"time": {"$gte": { "$date": "2019-07-28T00:00:00+0000"} } }')
+
+issues$find(
+    query = '{"created_at": { "$gte" : { "$date" : "2017-01-01T00:00:00Z" }}}',
+    fields = '{"created_at" : true, "user.login" : true, "title":true, "_id": false}'
+)
 
 # Create a column of Time object values
 all_tweets$time_created <- as.POSIXct(all_tweets$time, 'UTC')
 
-first_10k <- tweets$find("{}", limit=10000) %>% as.data.frame
+first_10k <- tweets$find("{}", limit=1) %>% as.data.frame
 #first_10k$time_lt <- strptime(first_10k$time, format = "%Y-%m-%d %H:%M:%S")
 first_10k$time_created <- as.POSIXct(first_10k$time, 'UTC')
 
@@ -176,5 +183,5 @@ aggregate(df_2$score_with_clean, by = list(df_2$minute, df_2$hour, df_2$day), FU
 final <- df_2 %>%
     group_by(minute, hour, day)
     #summarize(n())
-    #summarise(sum_score = mean(score_with_clean))
+    summarise(sum_score = sum(score_with_clean))
 
