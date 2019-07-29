@@ -25,7 +25,8 @@ from time import sleep
 import datetime
 # Botometer for bot detection
 #import botometer
-
+# Vader for Sentiment analysis
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 # Constants
 keywords = ["bitcoin", "ethereum", "cryptocurrency", "btc", "crypto", "eth", "blockchain", "bitcoin+news", "crypto+news", "hodl", "bitcoin+fud",
@@ -33,8 +34,6 @@ keywords = ["bitcoin", "ethereum", "cryptocurrency", "btc", "crypto", "eth", "bl
 # cryptonews, bitcoin, bitcoinmining, hodl, sell bitcion, buy bitcoin, bitcoin whale, bitcoin moooning
 stopWords = set(stopwords.words("english"))
 engCorpus = set(words.words())
-
-
 
 # MongoDB @ 192.168.2.69:27017
 client = MongoClient("192.168.2.69", 27017)
@@ -52,6 +51,9 @@ twitterAuth = {
 # Botometer API key
 #botAPIKey = "cd3f38366emshdd2cd0a2a5cca9ep14172djsn5f6c4df5a085"
 #bom = botometer.Botometer(wait_on_rate_limit = True, mashape_key = botAPIKey, **twitterAuth)
+
+# Vader analyser
+analyzer = SentimentIntensityAnalyzer()
 
 
 # Functions
@@ -82,7 +84,7 @@ def spamFilter(tweetText):
     for w in words:
         if (w not in orderedWords) and (w not in stopWords) and (w in engCorpus) and (len(w) > 1):
             orderedWords.add(w)
-            newText = newText + "," + w
+            newText = newText + " " + w
     return newText[1:]
 
 # Function that queries the botometer api to return a score
@@ -216,6 +218,10 @@ def cleanAndStore(data):
 
             # Reformat created_at key-value to a workable timestamp
             tweet["time"] = toTimestamp(tweet["created_at"])
+
+            # Store the sentiment score calculated by Vader
+            tweet["sentiment"] = analyzer.polarity_scores(tweet["text"])
+            tweet["sentiment_clean"] = analyzer.polarity_scores(tweet["cleaned_text"]) 
 
             # Save tweet
             result = twitterData.insert_one(tweet)
