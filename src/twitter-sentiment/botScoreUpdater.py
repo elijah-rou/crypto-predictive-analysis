@@ -23,11 +23,18 @@ bom = botometer.Botometer(wait_on_rate_limit = True, mashape_key = botAPIKey, **
 user_list = users.find({})
 user_list = list(user_list)
 
-# Grab botometer score for the first 17000 entries (first 10 done already)
+# Grab botometer score for the first 17000 entries (first 22 done already)
 # & insert into Mongo
-for i in range(10, 17000):
-    result = bom.check_account(user_list[i]["id"])
-    result.pop("display_scores")
-    result.pop("user")
-    pprint.pprint(result)
-    users.update_one({"_id": user_list[i]["_id"]}, {"$set": result})
+for i in range(23, 17000):
+    try:
+        result = bom.check_account(user_list[i]["id"])
+        result.pop("display_scores")
+        result.pop("user")
+        result["authorised"] = True
+        pprint.pprint(result)
+        users.update_one({"_id": user_list[i]["_id"]}, {"$set": result})
+    except:
+        print("User " + str(user_list[i]["id"]) + "(@" + user_list[i]["screen_name"] + ") is not authorised")
+        users.update_one({"_id": user_list[i]["_id"]}, {"$set": {"authorised": False}})
+        print("CONTINUING...")
+    
