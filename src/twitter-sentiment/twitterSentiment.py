@@ -14,8 +14,8 @@ twitterData = db.twitter
 #%%
 docs = twitterData.find(
 {
-  'time':{'$gte': "2019-07-27T00:00:00+0000",
-          '$lte': "2019-07-28T00:00:00+000"}
+  'time':{'$gte': "2019-07-30T00:00:00+0000",
+          '$lte': "2019-07-33T00:00:00+0000"}
 })
 
 # Convert to pandas dataframe
@@ -24,18 +24,16 @@ df = pd.DataFrame(list(docs))
 
 # Show first 10
 #%%
-df.head(10)
+df.head(1)
 
+#%%
+df.tail(10)
 # Remove all tweets that have the same text
 #%%
 df_2 = df.drop_duplicates(subset = "text", keep = "first")
 
 #%%
-df_2.to_csv("data/twitter/tweets_2019_07_27.csv")
-
-#%%
-df_3 = df_2.copy(deep = True)
-
+df_2.to_csv("data/twitter/tweets_2019_07_29.csv")
 
 #%%
 for index, row in df_3.head().iterrows():
