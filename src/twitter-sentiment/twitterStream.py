@@ -27,6 +27,9 @@ import datetime
 #import botometer
 # Vader for Sentiment analysis
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+# Tenacity
+from tenacity import retry
+from tenacity import wait_exponential
 
 # Constants
 keywords = ["bitcoin", "ethereum", "cryptocurrency", "btc", "crypto", "eth", "blockchain", "bitcoin+news", "crypto+news", "hodl", "bitcoin+fud",
@@ -279,12 +282,19 @@ class BitcoinListener(StreamListener):
     # OVERRIDE on_exception
     # If stream error, wait for 5 minutes
     def on_exception(self, exception):
-        print(exception)
-        print(str(datetime.datetime.now()) +" - Exception: " + str(exception) +"\n")
-        print("Stream encountered a problem. Sleeping for 5 minutes")
-        sleep(3000)
-        return 
+        raise exception
+        #return 
 
+# Wrapper function for the stream so that when timeouts occur
+# tenacity will just retry the connection
+@retry(wait=wait_exponential(multiplier=1, min=5, max=60))
+def tenacityStream(stream):
+    try:
+        stream.filter(languages = ["en"], track = keywords, is_async = True, stall_warnings = True)
+    except Exception as e:
+        print(e)
+        print(str(datetime.datetime.now()) +" - Exception: " + str(e) +"\n")
+        print("Stream encountered a problem. Retrying")
 
 # Main Function
 def main():
@@ -297,6 +307,7 @@ def main():
     stream = Stream(authentication, btcListener, tweet_mode = "extended")
 
     # Filter stream by keywords
-    stream.filter(languages = ["en"], track = keywords, is_async = True, stall_warnings = True)
+    #stream.filter(languages = ["en"], track = keywords, is_async = True, stall_warnings = True)
+    tenacityStream(stream)
 
 if __name__ == "__main__": main()
