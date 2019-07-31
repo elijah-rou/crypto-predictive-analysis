@@ -30,6 +30,8 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 # Tenacity
 from tenacity import retry
 from tenacity import wait_exponential
+# Logging
+import logging
 
 # Constants
 keywords = ["bitcoin", "ethereum", "cryptocurrency", "btc", "crypto", "eth", "blockchain", "bitcoin+news", "crypto+news", "hodl", "bitcoin+fud",
@@ -59,9 +61,11 @@ twitterAuth = {
 # Vader analyser
 analyzer = SentimentIntensityAnalyzer()
 
+# Logging configuration
+logging.basicConfig(level=logging.INFO, filename="logs/twitter_stream.log", filemode="a", format="%(levelname)s - %(asctime)s - %(message)s")
+
 
 # Functions
-
 # Function to clean tweet text (Remove whitespace, convert to lowercase, remove non-alphabetic characters)
 def textCleaner(tweetText):
     # Convert text to lowercase
@@ -137,14 +141,13 @@ def cleanAndStore(data):
     if (tweet["retweeted"] == False) and (tweet["text"][0:2] != "RT") and ("retweeted_status" not in tweet): 
         # Check if the tweet uses extended text
         # If tweet is extended use that format else use normal format
-        print(str(datetime.datetime.now()) + ": " + "RECIEVING: " + id)
+        logging.info("RECIEVING: " + id)
         if "extended_text" in tweet:
             text = tweet["extended_tweet"]["full_text"]
             tweet["text"] = text
             tweet.pop("extended_tweet")
         else:
             text = tweet["text"]
-        #print(text)
 
         # Clean and Filter data from tweet
         text = textCleaner(text)
@@ -234,12 +237,13 @@ def cleanAndStore(data):
             user["time"] = toTimestamp(user["created_at"])
             twitterUsers.update_one({"id": user["id"]},{"$set": user}, upsert  = True)
             result = twitterData.insert_one(tweet)
-            print(str(datetime.datetime.now()) + ": " + id + ' POSTED as {0}'.format(result.inserted_id))
+            logging.info(id + ' POSTED as {0}'.format(result.inserted_id))
+            print(str(datetime.datetime.now()) + ": " + id + ' POSTED as {0}'.format(result.inserted_id)) 
             
         else:
-            print("ERROR 2: Tweet id=" + id + " has no meaningful info. Ignoring...")
+            logging.error("Tweet id=" + id + " has no meaningful info. Ignoring...")
     else:
-        print("ERROR 1: Tweet id=" + id + " is a retweet. Ignoring...")
+        logging.error("Tweet id=" + id + " is a retweet. Ignoring...")
 
 
 
@@ -249,28 +253,25 @@ class BitcoinListener(StreamListener):
 
     # OVERRIDE on_status
     def on_status(self, statusCode):
-        print("Status: " + str(statusCode))
+        logging.info("Status: " + str(statusCode))
 
     # OVERRIDE on_error
     def on_error(self, statusCode):
-        print("Error: " + str(statusCode))
-        print(str(datetime.datetime.now()) +" - Error: " + str(statusCode) +"\n")
-        
         # If status is 420 error disconnect stream
         if statusCode == 420:
-            print("Making too many requests; Rate Limited")
+            logging.error(str(statusCode) +" Making too many requests; Rate Limited")
             return False
         if statusCode == 429:
-            print("Request cannot be served due to rate limit.")
+            logging.error(str(statusCode) +" Request cannot be served due to rate limit.")
             return False
         if statusCode == 500:
-            print("Internal Error")
+            logging.error(str(statusCode) +" Internal Error")
             return False
         if statusCode == 502:
-            print("Twitter is down")
+            logging.error(str(statusCode) +" Twitter is down")
             return False
         if statusCode == 503:
-            print("Service is unavailable")
+            logging.error(str(statusCode) +" Service is unavailable")
             return False
 
 
@@ -282,6 +283,9 @@ class BitcoinListener(StreamListener):
     # OVERRIDE on_exception
     # If stream error, wait for 5 minutes
     def on_exception(self, exception):
+        logging.critical("Stream error")
+        print(str(datetime.datetime.now()) + ": STREAM ERROR - check log")
+        logging.critical(str(exception))
         raise exception
         #return 
 
@@ -292,10 +296,7 @@ def tenacityStream(stream):
     try:
         stream.filter(languages = ["en"], track = keywords, is_async = True, stall_warnings = True)
     except Exception as e:
-        print(e)
-        print(str(datetime.datetime.now()) +" - Exception: " + str(e) +"\n")
-        print("Stream encountered a problem. Retrying")
-
+        logging.info("Retrying stream...")
 # Main Function
 def main():
     # Set up a stream listener
@@ -307,7 +308,6 @@ def main():
     stream = Stream(authentication, btcListener, tweet_mode = "extended")
 
     # Filter stream by keywords
-    #stream.filter(languages = ["en"], track = keywords, is_async = True, stall_warnings = True)
     tenacityStream(stream)
 
 if __name__ == "__main__": main()
