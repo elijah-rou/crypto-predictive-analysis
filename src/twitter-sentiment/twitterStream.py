@@ -299,6 +299,7 @@ def tenacityStream(stream):
         logging.info("Retrying stream...")
 # Main Function
 def main():
+    logging.info("Stream started")
     # Set up a stream listener
     btcListener = BitcoinListener()
 
