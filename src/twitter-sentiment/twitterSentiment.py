@@ -3,6 +3,18 @@
 from pymongo import MongoClient
 import datetime
 import pandas as pd
+import re
+import cryptocompare
+import pprint
+from datetime import datetime, timedelta
+import dateutil
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
+from sklearn.metrics import accuracy_score
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # Connect to MongoDB client
 #%%
@@ -13,10 +25,7 @@ twitterData = db.twitter
 # Find all tweets stored on the 27th of July
 #%%
 docs = twitterData.find(
-{
-  'time':{'$gte': "2019-07-30T00:00:00+0000",
-          '$lte': "2019-07-33T00:00:00+0000"}
-})
+{})
 
 # Convert to pandas dataframe
 #%%
@@ -27,59 +36,136 @@ df = pd.DataFrame(list(docs))
 df.head(1)
 
 #%%
-df.tail(10)
 # Remove all tweets that have the same text
-#%%
-df_2 = df.drop_duplicates(subset = "text", keep = "first")
-
-#%%
-df_2.to_csv("data/twitter/tweets_2019_07_29.csv")
-
-#%%
-for index, row in df_3.head().iterrows():
-    if (row["text"][0:2] == "RT"):
-        df_3.drop(index)
-
-#%%
-docs_2 = twitterData.find(
-{
-  'time':{'$gte': "2019-07-28T00:00:00+0000"
-          }
-})
-
-df_4 = pd.DataFrame(docs_2)
-
-#%%
-df_4.head(10)
+regex = re.compile("[^a-zA-Z]")
+df["text"] = df["text"].apply(lambda x: regex.sub(" ", x))
 
 
 #%%
-docs_3 = twitterData.find(
-{
-  'time':{'$gte': "2019-07-26T00:00:00+0000",
-          '$lte': "2019-07-27T00:00:00+0000"}
-})
+df = df.drop_duplicates(subset = "text", keep = "first")
 
 #%%
-df_5 = pd.DataFrame(docs_3)
+
+# Words to remove:
+# #mpgvip #freebitcoin #livescore #makeyourownlane #footballcorn
+# #freethereum entertaining subscribe [free, bitcoin] [free, etheruem]
+# [current, price] [bitcoin, price] [earn, bitcoin] [start, trading, bitcoin]
+# [join, bitcoin, mining] [free, dm, advise] [ethereum, price] [earn, etheruem]
+# [start, trading, ethereum] [join, ethereum, mining]
+
+def wordChecker(string):
+    if ("mgpvip" in string) or ("freebitcoin" in string) or ("makeyourownlane" in string) \
+    or ("footballcorn" in string) or ("freeethereum" in string) or ("entertaining" in string) \
+    or ("subscribe" in string) or ("free" in string and "bitcoin" in string) \
+    or ("free" in string and "ethereum" in string) or ("current" in string and "price" in string) \
+    or ("bitcoin" in string and "price" in string) or ("earn" in string and "bitcoin" in string) \
+    or ("ethereum" in string and "price" in string) or ("earn" in string and "ethereum" in string) \
+    or ("start" in string and "trading" in string and "bitcoin" in string) \
+    or ("start" in string and "trading" in string and "ethereum" in string) \
+    or ("join" in string and "bitcoin" in string and "mining" in string) \
+    or ("join" in string and "ethereum" in string and "mining" in string) \
+    or ("free" in string and "dm" in string and "advise" in string):
+        return True
+    else:
+        return False
+    
+#%%
+for index, row in tweet_df.head().iterrows():
+    if (wordChecker(row["text"])):
+        tweet_df.drop(index)
+
+# LEVENSHTEIN DISTANCE HERE
+#%%
+# Select only necessary columns
+tweet_df = df[["time", "sentiment", "sentiment_clean"]]
 
 #%%
-df_6 = df_5.drop_duplicates(subset = "text", keep = "first")
+# Get historical BTC price
+btc = cryptocompare.get_historical_price_hour("BTC", "USD", )
 
 #%%
-df_7 = df_6[df_6["retweeted_status"].isnull()]
+# Create dataframe
+btc_df = pd.DataFrame.from_dict(btc["Data"])
+def toTime(unixTime):
+    utcTime = str(datetime.utcfromtimestamp(unixTime))
+    return dateutil.parser.parse(utcTime[0:11]+" "+utcTime[11:20])
+btc_df["time"] = btc_df["time"].apply(toTime)
+del btc
 
 
 #%%
-df_7.head(10)
+# Process twitter df
+# Change time to datetime
+tweet_df["time"] = tweet_df["time"].apply(dateutil.parser.parse)
+# Extract vader sscore
+tweet_df["neu"] = tweet_df["sentiment"].apply(lambda x: x["neu"])
+tweet_df["neu_clean"] = tweet_df["sentiment_clean"].apply(lambda x: x["neu"])
+tweet_df["pos"] = tweet_df["sentiment"].apply(lambda x: x["pos"])
+tweet_df["pos_clean"] = tweet_df["sentiment_clean"].apply(lambda x: x["pos"])
+tweet_df["neg"] = tweet_df["sentiment"].apply(lambda x: x["neg"])
+tweet_df["neg_clean"] = tweet_df["sentiment_clean"].apply(lambda x: x["neg"])
+tweet_df["com"] = tweet_df["sentiment"].apply(lambda x: x["compound"])
+tweet_df["com_clean"] = tweet_df["sentiment_clean"].apply(lambda x: x["compound"])
+
+#%%
+# Add one hour to sentiment scores (want to predict if sentiment affects price 1 hour from now)
+tweet_df["time"] = tweet_df["time"].apply(lambda x: x + timedelta(hours=1))
+
+#%%
+# Calculate mean scores per hour
+tweetpHour_df = tweet_df.resample("H", on="time").mean()
+
+#%%
+#tweetpHour_df = tweetpHour_df.dropna()
+
+#%%
+sentdf = pd.merge(tweetpHour_df, btc_df, on="time", how="left")
+
+#%%
+# Visualise pos sentiment over time
+sns.set_style("whitegrid")
+sns.barplot(x="time", y="pos", data=sentdf[["time", "pos", "close"]])
 
 
 #%%
-df_8 = df_7[["text", "time", "cleaned_text", "_id"]]
+sentdf.plot(x="time", y=["close", "neu", "pos", "neg"], secondary_y=["neu", "pos", "neg"], mark_right=False)
 
 
 #%%
-df_8.to_csv("data/twitter/tweets_2019_07_27.csv")
+# Add a price change variable to sentdf
+sentdf = sentdf.dropna()
+def deltaPolarity(x, y):
+    if (x - y) >= 0:
+        return 1
+    else:
+        return 0
+
+sentdf["price_delta"] = sentdf["close"] - sentdf["open"]
+
+
+#%%
+sentdf["delta_bool"] = sentdf["price_delta"].apply(lambda x: 1 if x >= 0 else 0)
+
+#%%
+# Remove unnecessary columns
+train = sentdf[["neu", "pos", "neg", "delta_bool"]]
+trainClean = sentdf[["neu_clean", "pos_clean", "neg_clean", "delta_bool"]]
+#%%
+# Create logistic regression model
+# Split data
+X_train, X_test, y_train, y_test = \
+train_test_split(train.drop("delta_bool", axis=1), train["delta_bool"], test_size=0.3, random_state=322)
+
+#%%
+logModel = LogisticRegression()
+logModel.fit(X_train, y_train)
+
+predictions = logModel.predict(X_test)
+
+
+#%%
+print(classification_report(y_test,predictions))
+print("Accuracy:", accuracy_score(y_test, predictions))
 
 
 #%%

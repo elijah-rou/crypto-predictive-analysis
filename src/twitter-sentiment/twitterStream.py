@@ -158,9 +158,6 @@ def cleanAndStore(data):
             # Refactor important values
             tweet["tweet_id"] = tweet.pop("id")
 
-            ## TODO
-            ## STORE HASHTAGS
-
             # Remove unecessary attributes
             tweet.pop("id_str")
             tweet.pop("in_reply_to_status_id")
@@ -184,10 +181,6 @@ def cleanAndStore(data):
             # From "entities" key
             if "entities" in tweet:
                 tweet.pop("entities")
-                # tweet["entities"].pop("media")
-                # tweet["entities"].pop("urls")
-                # tweet["entities"].pop("symbols")
-                # tweet["entities"].pop("user_mentions")
 
             # From "user" key
             tweet["user"].pop("default_profile")
@@ -297,6 +290,7 @@ def tenacityStream(stream):
         stream.filter(languages = ["en"], track = keywords, is_async = True, stall_warnings = True)
     except Exception as e:
         logging.info("Retrying stream...")
+
 # Main Function
 def main():
     logging.info("Stream started")
