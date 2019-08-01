@@ -15,6 +15,7 @@ from sklearn.metrics import accuracy_score
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+from Levenshtein._levenshtein import distance 
 
 # Connect to MongoDB client
 #%%
@@ -38,7 +39,7 @@ df.head(1)
 #%%
 # Remove all tweets that have the same text
 regex = re.compile("[^a-zA-Z]")
-df["text"] = df["text"].apply(lambda x: regex.sub(" ", x))
+df["text"] = df["text"].apply(lambda x: re.sub("\s\s+", " ", (regex.sub(" ", x))))
 
 
 #%%
@@ -70,14 +71,21 @@ def wordChecker(string):
         return False
     
 #%%
-for index, row in tweet_df.head().iterrows():
-    if (wordChecker(row["text"])):
-        tweet_df.drop(index)
+df["flagged"] = wordChecker(df["text"])
+df = df[~df["flagged"]]
+df.drop(["flagged"], axis=1)
 
-# LEVENSHTEIN DISTANCE HERE
+#%%
+# Remove all tweets where Levenshtein distance < 7
+#for index, row in df.head().iterrows():
+#    for i, r in df.head().iterrows():
+#        if (i != index) and (distance(row["clean_text"], r["clean_text"]) < 3):
+#            df.drop(i)
+
 #%%
 # Select only necessary columns
 tweet_df = df[["time", "sentiment", "sentiment_clean"]]
+
 
 #%%
 # Get historical BTC price
@@ -116,7 +124,7 @@ tweet_df["time"] = tweet_df["time"].apply(lambda x: x + timedelta(hours=1))
 tweetpHour_df = tweet_df.resample("H", on="time").mean()
 
 #%%
-#tweetpHour_df = tweetpHour_df.dropna()
+tweetpHour_df = tweetpHour_df.dropna()
 
 #%%
 sentdf = pd.merge(tweetpHour_df, btc_df, on="time", how="left")
