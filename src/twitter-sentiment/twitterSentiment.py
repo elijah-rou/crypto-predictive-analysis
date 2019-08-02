@@ -145,7 +145,7 @@ tweet_df = tweet_df[tweet_df["com_bool"] <= 1]
 tweetpHour_df = tweet_df.resample("H", on="time").mean()
 
 #%%
-processed = tweetpHour_df[["com"]]
+#processed = tweetpHour_df[["com"]]
 
 #%%
 def sentimentDelta(row):
@@ -157,8 +157,11 @@ def sentimentDelta(row):
 #processed["sent_delta"] = processed.apply(sentimentDelta)
 
 
+
 #%%
 sentdf = pd.merge(tweetpHour_df, btc_df, on="time", how="inner")
+
+#%%
 sentdf.plot(x="time", y=["close",  "com"], secondary_y=["com"], mark_right=False, colormap='Paired')
 
 #%%
@@ -169,14 +172,16 @@ sentpHour_df.plot.bar(colormap='Paired')
 #%%
 # Add a price change variable to sentdf
 sentdf = sentdf.dropna()
-def deltaPolarity(x, y):
-    if (x - y) >= 0:
-        return 1
-    else:
-        return 0
-
 sentdf["price_delta"] = sentdf["close"] - sentdf["open"]
 sentdf["delta_bool"] = sentdf["price_delta"].apply(lambda x: 1 if x >= 0 else 0)
+
+#%%
+p_change = sentdf["com"].pct_change(1)
+p_change = p_change.apply(lambda x: 1 if x > 0 else 0)
+sentdf["com_change"] = p_change
+# Filter for only continuous data
+sentdf = sentdf.iloc[10:]
+sentdf = sentdf.iloc[100:]
 
 #%%
 # Remove unnecessary columns
@@ -187,15 +192,6 @@ X_train, X_test, y_train, y_test = \
 train_test_split(train.drop("delta_bool", axis=1), train["delta_bool"], test_size=0.3, random_state=322)
 
 #%%
-logModel = LogisticRegression()
-logModel.fit(X_train, y_train)
-log_pred = logModel.predict(X_test)
-print(classification_report(y_test, log_pred))
-print(confusion_matrix(y_test, log_pred))
-print("Accuracy:", accuracy_score(y_test, log_pred))
-
-
-#%%
 from sklearn.ensemble import RandomForestClassifier
 clf = RandomForestClassifier(n_estimators = 1000, max_depth = 4, random_state = 0)
 clf.fit(X_train, y_train)
@@ -203,24 +199,3 @@ rf_pred = clf.predict(X_test)
 print(classification_report(y_test, rf_pred))
 print(confusion_matrix(y_test, rf_pred))
 print("Accuracy:", accuracy_score(y_test,  rf_pred))
-
-#%%
-from sklearn.neural_network import MLPClassifier
-clf = MLPClassifier(solver='lbfgs', alpha=1e-5, hidden_layer_sizes=(5, 2), random_state=1)
-clf.fit(X_train, y_train)
-mlp_pred = clf.predict(X_test)
-print(classification_report(y_test, mlp_pred))
-print(confusion_matrix(y_test, mlp_pred))
-print("Accuracy:", accuracy_score(y_test,  mlp_pred))
-
-
-#%%
-from sklearn import svm
-clf = svm.SVC(gamma='scale')
-clf.fit(X_train, y_train)
-svm_pred = clf.predict(X_test)
-print(classification_report(y_test, svm_pred))
-print(confusion_matrix(y_test, svm_pred))
-print("Accuracy:", accuracy_score(y_test,  svm_pred))
-
-#%%
