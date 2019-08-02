@@ -12,6 +12,9 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
 from sklearn.metrics import accuracy_score
+from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import mean_squared_error
+from sklearn.metrics import confusion_matrix
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -44,6 +47,7 @@ df["text"] = df["text"].apply(lambda x: re.sub("\s\s+", " ", (regex.sub(" ", x))
 
 #%%
 df = df.drop_duplicates(subset = "text", keep = "first")
+df = df.drop_duplicates(subset="cleaned_text", keep = "first")
 
 #%%
 
@@ -116,28 +120,51 @@ tweet_df["com"] = tweet_df["sentiment"].apply(lambda x: x["compound"])
 tweet_df["com_clean"] = tweet_df["sentiment_clean"].apply(lambda x: x["compound"])
 
 #%%
-# Add one hour to sentiment scores (want to predict if sentiment affects price 1 hour from now)
-tweet_df["time"] = tweet_df["time"].apply(lambda x: x + timedelta(hours=1))
+#tweet_df.drop("sentiment", axis =1)
+#tweet_df.drop("sentiment_clean", axis =1)
+
+#%%
+# Add one hour to sentiment scores (want to predict if sentiment affects price 3 hour from now)
+tweet_df["time"] = tweet_df["time"].apply(lambda x: x + timedelta(hours=3))
+
+#%%
+def sentimentThreshold(sentiment):
+    if (sentiment > 0.5):
+        return 1
+    elif (sentiment < -0.5):
+        return 0
+    else:
+        return 2
+tweet_df["com_bool"] = tweet_df["com"].apply(sentimentThreshold)
+
+#%%
+tweet_df = tweet_df[tweet_df["com_bool"] <= 1]
 
 #%%
 # Calculate mean scores per hour
 tweetpHour_df = tweet_df.resample("H", on="time").mean()
 
 #%%
-tweetpHour_df = tweetpHour_df.dropna()
+processed = tweetpHour_df[["com"]]
 
 #%%
-sentdf = pd.merge(tweetpHour_df, btc_df, on="time", how="left")
+def sentimentDelta(row):
+    if (row.shift(1)["com"].isnull()):
+        row["sent_delta"] = 0
+    else:
+        row["sent_delta"] = row["com"]= row.shift(1)["com"]
+
+#processed["sent_delta"] = processed.apply(sentimentDelta)
+
 
 #%%
-# Visualise pos sentiment over time
-sns.set_style("whitegrid")
-sns.barplot(x="time", y="pos", data=sentdf[["time", "pos", "close"]])
-
+sentdf = pd.merge(tweetpHour_df, btc_df, on="time", how="inner")
+sentdf.plot(x="time", y=["close",  "com"], secondary_y=["com"], mark_right=False, colormap='Paired')
 
 #%%
-sentdf.plot(x="time", y=["close", "neu", "pos", "neg"], secondary_y=["neu", "pos", "neg"], mark_right=False)
-
+# Calculate cumulative score of sentiment per hour 
+sentpHour_df = tweet_df.resample("A", on="time").sum()
+sentpHour_df.plot.bar(colormap='Paired')
 
 #%%
 # Add a price change variable to sentdf
@@ -149,17 +176,12 @@ def deltaPolarity(x, y):
         return 0
 
 sentdf["price_delta"] = sentdf["close"] - sentdf["open"]
-
-
-#%%
 sentdf["delta_bool"] = sentdf["price_delta"].apply(lambda x: 1 if x >= 0 else 0)
 
 #%%
 # Remove unnecessary columns
-train = sentdf[["neu", "pos", "neg", "delta_bool"]]
-trainClean = sentdf[["neu_clean", "pos_clean", "neg_clean", "delta_bool"]]
-#%%
-# Create logistic regression model
+train = sentdf[["com", "delta_bool"]]
+#train = sentdf[["pos", "neg" ,"neu", "delta_bool"]]
 # Split data
 X_train, X_test, y_train, y_test = \
 train_test_split(train.drop("delta_bool", axis=1), train["delta_bool"], test_size=0.3, random_state=322)
@@ -167,13 +189,38 @@ train_test_split(train.drop("delta_bool", axis=1), train["delta_bool"], test_siz
 #%%
 logModel = LogisticRegression()
 logModel.fit(X_train, y_train)
-
-predictions = logModel.predict(X_test)
+log_pred = logModel.predict(X_test)
+print(classification_report(y_test, log_pred))
+print(confusion_matrix(y_test, log_pred))
+print("Accuracy:", accuracy_score(y_test, log_pred))
 
 
 #%%
-print(classification_report(y_test,predictions))
-print("Accuracy:", accuracy_score(y_test, predictions))
+from sklearn.ensemble import RandomForestClassifier
+clf = RandomForestClassifier(n_estimators = 1000, max_depth = 4, random_state = 0)
+clf.fit(X_train, y_train)
+rf_pred = clf.predict(X_test)
+print(classification_report(y_test, rf_pred))
+print(confusion_matrix(y_test, rf_pred))
+print("Accuracy:", accuracy_score(y_test,  rf_pred))
 
+#%%
+from sklearn.neural_network import MLPClassifier
+clf = MLPClassifier(solver='lbfgs', alpha=1e-5, hidden_layer_sizes=(5, 2), random_state=1)
+clf.fit(X_train, y_train)
+mlp_pred = clf.predict(X_test)
+print(classification_report(y_test, mlp_pred))
+print(confusion_matrix(y_test, mlp_pred))
+print("Accuracy:", accuracy_score(y_test,  mlp_pred))
+
+
+#%%
+from sklearn import svm
+clf = svm.SVC(gamma='scale')
+clf.fit(X_train, y_train)
+svm_pred = clf.predict(X_test)
+print(classification_report(y_test, svm_pred))
+print(confusion_matrix(y_test, svm_pred))
+print("Accuracy:", accuracy_score(y_test,  svm_pred))
 
 #%%
