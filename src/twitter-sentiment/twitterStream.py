@@ -233,11 +233,6 @@ def cleanAndStore(data):
             logging.info(id + ' POSTED as {0}'.format(result.inserted_id))
             print(str(datetime.datetime.now()) + ": " + id + ' POSTED as {0}'.format(result.inserted_id)) 
             
-        else:
-            logging.error("Tweet id=" + id + " has no meaningful info. Ignoring...")
-    else:
-        logging.error("Tweet id=" + id + " is a retweet. Ignoring...")
-
 
 
 # Classes
@@ -279,7 +274,7 @@ class BitcoinListener(StreamListener):
         logging.critical("Stream error")
         print(str(datetime.datetime.now()) + ": STREAM ERROR - check log")
         logging.critical(str(exception))
-        raise exception
+        #raise exception
         #return 
 
 # Wrapper function for the stream so that when timeouts occur
@@ -303,6 +298,17 @@ def main():
     stream = Stream(authentication, btcListener, tweet_mode = "extended")
 
     # Filter stream by keywords
-    tenacityStream(stream)
+    while not stream.running:
+        try:
+            logging.info("Started run")
+            tenacityStream(stream)
+        except (Timeout, SSLError, ReadTimeoutError, ConnectionError) as e:
+            logging.warning("Network error occurred. Keep calm and carry on.", str(e))
+        except Exception as e:
+            logging.error("Unexpected error!", e)
+        finally:
+            logging.info("Stream has crashed. System will restart twitter stream in 1 min!")
+            sleep(60)
+    logging.critical("Ai how did this break")
 
 if __name__ == "__main__": main()
