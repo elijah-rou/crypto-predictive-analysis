@@ -193,9 +193,13 @@ train_test_split(train.drop("delta_bool", axis=1), train["delta_bool"], test_siz
 
 #%%
 from sklearn.ensemble import RandomForestClassifier
-clf = RandomForestClassifier(n_estimators = 1000, max_depth = 4, random_state = 0)
+# 86% - n(1000)/depth(5) || 71% - n(5000)/depth(9)
+clf = RandomForestClassifier(n_estimators = 5000, max_depth = 9, random_state = 0)
 clf.fit(X_train, y_train)
 rf_pred = clf.predict(X_test)
 print(classification_report(y_test, rf_pred))
 print(confusion_matrix(y_test, rf_pred))
 print("Accuracy:", accuracy_score(y_test,  rf_pred))
+
+
+#%%
