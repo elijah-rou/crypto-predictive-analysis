@@ -146,7 +146,7 @@ def cleanAndStore(data):
     if (tweet["retweeted"] == False) and (tweet["text"][0:2] != "RT") and ("retweeted_status" not in tweet): 
         # Check if the tweet uses extended text
         # If tweet is extended use that format else use normal format
-        logging.info("RECIEVING: " + id)
+        print("RECIEVING: " + id)
         if "extended_text" in tweet:
             text = tweet["extended_tweet"]["full_text"]
             tweet["text"] = text
@@ -235,7 +235,7 @@ def cleanAndStore(data):
             user["time"] = toTimestamp(user["created_at"])
             twitterUsers.update_one({"id": user["id"]},{"$set": user}, upsert  = True)
             result = twitterData.insert_one(tweet)
-            logging.info(id + ' POSTED as {0}'.format(result.inserted_id))
+            print(id + ' POSTED as {0}'.format(result.inserted_id))
             print(str(datetime.datetime.now()) + ": " + id + ' POSTED as {0}'.format(result.inserted_id)) 
             
 
@@ -244,7 +244,7 @@ def cleanAndStore(data):
 # override tweepy.StreamListener
 class BitcoinListener(StreamListener):
 
-    def __init__(self, q=Queue):
+    def __init__(self, q=Queue()):
         # Create 4 threads that will handle tweet cleaning
         self.q = q
         for i in range(0, 4):
