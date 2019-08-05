@@ -5,4 +5,4 @@
 *.Rproj
 .DS_Store
 *.json
-*.csv
+/data/btc*
