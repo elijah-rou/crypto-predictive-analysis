@@ -43,21 +43,16 @@ df.head(1)
 # Remove all tweets that have the same text
 regex = re.compile("[^a-zA-Z]")
 df["text"] = df["text"].apply(lambda x: re.sub("\s\s+", " ", (regex.sub(" ", x))))
-
-
-#%%
 df = df.drop_duplicates(subset = "text", keep = "first")
 df = df.drop_duplicates(subset="cleaned_text", keep = "first")
 
 #%%
-
 # Words to remove:
 # #mpgvip #freebitcoin #livescore #makeyourownlane #footballcorn
 # #freethereum entertaining subscribe [free, bitcoin] [free, etheruem]
 # [current, price] [bitcoin, price] [earn, bitcoin] [start, trading, bitcoin]
 # [join, bitcoin, mining] [free, dm, advise] [ethereum, price] [earn, etheruem]
 # [start, trading, ethereum] [join, ethereum, mining]
-
 def wordChecker(string):
     if ("mgpvip" in string) or ("freebitcoin" in string) or ("makeyourownlane" in string) \
     or ("footballcorn" in string) or ("freeethereum" in string) or ("entertaining" in string) \
@@ -73,8 +68,6 @@ def wordChecker(string):
         return True
     else:
         return False
-    
-#%%
 df["flagged"] = wordChecker(df["text"])
 df = df[~df["flagged"]]
 df.drop(["flagged"], axis=1)
@@ -120,14 +113,12 @@ tweet_df["com"] = tweet_df["sentiment"].apply(lambda x: x["compound"])
 tweet_df["com_clean"] = tweet_df["sentiment_clean"].apply(lambda x: x["compound"])
 
 #%%
-#tweet_df.drop("sentiment", axis =1)
-#tweet_df.drop("sentiment_clean", axis =1)
+# Drop unnecessary columns
+tweet_df = tweet_df.drop("sentiment", axis =1)
+tweet_df = tweet_df.drop("sentiment_clean", axis =1)
 
 #%%
-# Add one hour to sentiment scores (want to predict if sentiment affects price 3 hour from now)
-tweet_df["time"] = tweet_df["time"].apply(lambda x: x + timedelta(hours=3))
-
-#%%
+# Filter out all "neutral" tweets (Vader Com > +- 0.5)
 def sentimentThreshold(sentiment):
     if (sentiment > 0.5):
         return 1
@@ -136,8 +127,6 @@ def sentimentThreshold(sentiment):
     else:
         return 2
 tweet_df["com_bool"] = tweet_df["com"].apply(sentimentThreshold)
-
-#%%
 tweet_df = tweet_df[tweet_df["com_bool"] <= 1]
 
 #%%
@@ -156,9 +145,28 @@ def sentimentDelta(row):
 
 #processed["sent_delta"] = processed.apply(sentimentDelta)
 
-
+#%%
+# Calculate pearson correlation for different shifts
+from scipy.stats import pearsonr
+from datetime import timedelta
+from scipy.stats import pearsonr
+testdf = tweetpHour_df.copy(deep=True)
+for i in range(1, 12):
+    # Merge btc and title df's into one
+    testdf.index = testdf.index + pd.DateOffset(hours=1)
+    sentdf = pd.merge(btc_df, testdf, on="time", how="inner") 
+    sentdf = sentdf.dropna()
+    sentdf["price_delta"] = sentdf["close"] - sentdf["open"]
+    sentdf["delta_bool"] = sentdf["price_delta"].apply(lambda x: 1 if x >= 0 else 0)
+    correlation = pearsonr(sentdf["com"], sentdf["delta_bool"])
+    print("Shift of " + str(i) + " hours." + str(correlation))
 
 #%%
+# Add 3 hours to sentiment scores (want to predict if sentiment affects price 3 hour from now)
+tweetpHour_df.index = tweetpHour_df.index + pd.DateOffset(9)
+
+#%%
+# Merge dataframes
 sentdf = pd.merge(tweetpHour_df, btc_df, on="time", how="inner")
 
 #%%
@@ -202,4 +210,3 @@ print(confusion_matrix(y_test, rf_pred))
 print("Accuracy:", accuracy_score(y_test,  rf_pred))
 
 
-#%%
