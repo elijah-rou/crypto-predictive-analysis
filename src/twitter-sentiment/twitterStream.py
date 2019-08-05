@@ -32,6 +32,9 @@ from tenacity import retry
 from tenacity import wait_exponential
 # Logging
 import logging
+# URLlib3 and requests
+import urllib3
+import requests
 
 # Constants
 keywords = ["bitcoin", "ethereum", "cryptocurrency", "btc", "crypto", "eth", "blockchain", "bitcoin+news", "crypto+news", "hodl", "bitcoin+fud",
@@ -298,17 +301,22 @@ def main():
     stream = Stream(authentication, btcListener, tweet_mode = "extended")
 
     # Filter stream by keywords
-    while not stream.running:
+    while True:
         try:
             logging.info("Started run")
             tenacityStream(stream)
         except (Timeout, SSLError, ReadTimeoutError, ConnectionError) as e:
             logging.warning("Network error occurred. Keep calm and carry on.", str(e))
+        except urllib3.exceptions.ProtocolError as e:
+            logging.warning("Protocol error. Les restart!")
+        except ConnectionError as e:
+            logging.warning("Some sort of connection error. Keep going")
+        except requests.exceptions.ConnectionError as e:
+            logging.warning("Request connection error. Ooooops...")
         except Exception as e:
             logging.error("Unexpected error!", e)
-        finally:
-            logging.info("Stream has crashed. System will restart twitter stream in 1 min!")
-            sleep(60)
+        logging.info("Stream has crashed. System will restart twitter stream in 5 min!")
+        sleep(3000)
     logging.critical("Ai how did this break")
 
 if __name__ == "__main__": main()
