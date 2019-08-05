@@ -18,7 +18,7 @@ from nltk.tokenize import word_tokenize
 # MongoDB Library
 from pymongo import MongoClient
 # Python thread class
-import _thread
+from threading import Thread 
 # Thread sleeping
 from time import sleep
 # Time for logging
@@ -35,6 +35,8 @@ import logging
 # URLlib3 and requests
 import urllib3
 import requests
+# Queue
+from queue import Queue
 
 # Constants
 keywords = ["bitcoin", "ethereum", "cryptocurrency", "btc", "crypto", "eth", "blockchain", "bitcoin+news", "crypto+news", "hodl", "bitcoin+fud",
@@ -242,6 +244,13 @@ def cleanAndStore(data):
 # override tweepy.StreamListener
 class BitcoinListener(StreamListener):
 
+    def __init__(self, q=Queue):
+        # Create 4 threads that will handle tweet cleaning
+        self.q = q
+        for i in range(0, 4):
+            t = Thread(target=self.cleanTweets)
+            t.daemon = True
+            t.start()
     # OVERRIDE on_status
     def on_status(self, statusCode):
         logging.info("Status: " + str(statusCode))
@@ -265,11 +274,10 @@ class BitcoinListener(StreamListener):
             logging.error(str(statusCode) +" Service is unavailable")
             return False
 
-
     # OVERRIDE on_data
     def on_data(self, data):
-        _thread.start_new_thread(cleanAndStore, (data,))
-        # Start a new thread that processes the tweet
+        # Attach the data to the process queue
+        self.q.put(data)
     
     # OVERRIDE on_exception
     # If stream error, wait for 5 minutes
@@ -278,7 +286,11 @@ class BitcoinListener(StreamListener):
         print(str(datetime.datetime.now()) + ": STREAM ERROR - check log")
         logging.critical(str(exception))
         #raise exception
-        #return 
+    
+    def cleanTweets(self):
+        while True:
+            cleanAndStore(self.q.get())
+            self.q.task_done()
 
 # Wrapper function for the stream so that when timeouts occur
 # tenacity will just retry the connection
