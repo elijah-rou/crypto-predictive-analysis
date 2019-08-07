@@ -73,13 +73,6 @@ df = df[~df["flagged"]]
 df.drop(["flagged"], axis=1)
 
 #%%
-# Remove all tweets where Levenshtein distance < 7
-#for index, row in df.head().iterrows():
-#    for i, r in df.head().iterrows():
-#        if (i != index) and (distance(row["clean_text"], r["clean_text"]) < 3):
-#            df.drop(i)
-
-#%%
 # Select only necessary columns
 tweet_df = df[["time", "sentiment", "sentiment_clean"]]
 
@@ -163,19 +156,34 @@ for i in range(1, 12):
 
 #%%
 # Add 3 hours to sentiment scores (want to predict if sentiment affects price 3 hour from now)
-tweetpHour_df.index = tweetpHour_df.index + pd.DateOffset(9)
+tweetpHour_df.index = tweetpHour_df.index + pd.DateOffset(3)
 
 #%%
 # Merge dataframes
 sentdf = pd.merge(tweetpHour_df, btc_df, on="time", how="inner")
 
-#%%
-sentdf.plot(x="time", y=["close",  "com"], secondary_y=["com"], mark_right=False, colormap='Paired')
 
 #%%
-# Calculate cumulative score of sentiment per hour 
-sentpHour_df = tweet_df.resample("A", on="time").sum()
-sentpHour_df.plot.bar(colormap='Paired')
+# Filter for only continuous data
+sentdf = sentdf.iloc[10:]
+sentdf = sentdf.iloc[100:]
+sentdf = sentdf.set_index("time")
+
+#%%
+sentdf.plot(y=["close",  "com"], secondary_y=["com"], mark_right=False, colormap='Paired')
+
+#%%
+import matplotlib.pyplot as plt
+fig, ax1 = plt.subplots()
+sentdf['close'].plot(ax=ax1, alpha=0.0)
+sentdf['com'].plot(secondary_y=True, ax=ax1, alpha=0.0)
+ax = sentdf['close'].plot(color="#FF372A"); 
+ax.set_ylabel('BTC closing price (USD $)', fontsize=10, color="#FF372A")
+sentdf['com'].plot(ax=ax, secondary_y=True, title="Average hourly Twitter sentiment and BTC closing price from 29/07-08/08." \
+    ,color="#2AD8FF", figsize=(10, 7), alpha=0.8)
+plt.xlabel('Day', fontsize=10) 
+plt.ylabel('Average Twitter sentiment', fontsize=10, rotation=-90, color="#2AD8FF")
+plt.savefig("output/Twitter_Hourly_vs_BTC_price_closing.png", dpi=300)
 
 #%%
 # Add a price change variable to sentdf
@@ -187,9 +195,6 @@ sentdf["delta_bool"] = sentdf["price_delta"].apply(lambda x: 1 if x >= 0 else 0)
 p_change = sentdf["com"].pct_change(1)
 p_change = p_change.apply(lambda x: 1 if x > 0 else 0)
 sentdf["com_change"] = p_change
-# Filter for only continuous data
-sentdf = sentdf.iloc[10:]
-sentdf = sentdf.iloc[100:]
 
 #%%
 # Remove unnecessary columns
@@ -210,3 +215,6 @@ print(confusion_matrix(y_test, rf_pred))
 print("Accuracy:", accuracy_score(y_test,  rf_pred))
 
 
+
+
+#%%
