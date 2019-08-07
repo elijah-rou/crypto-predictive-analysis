@@ -94,9 +94,15 @@ df["com_bool"] = df["com"].apply(sentimentThreshold)
 df = df[df["com_bool"] <= 1]
 df = df.drop("com_bool", axis=1)
 
+
 #%%
-df.index.names = ["time"]
-df.index = pd.to_datetime(df.index, utc=True)
+df["time"] = df.index
+def timeFixer(string):
+    return string[0:-1] + ".000Z"
+df["time"] = df["time"].apply(lambda x: timeFixer(str(x)))
+df["time"] = pd.to_datetime(df["time"], utc=True)
+#%%
+df = df.set_index("time")
 
 
 #%%
@@ -116,12 +122,13 @@ def toTime(unixTime):
     utcTime = str(datetime.utcfromtimestamp(unixTime))
     return parser.parse(utcTime[0:11]+" "+utcTime[11:20])
 btc_df["time"] = btc_df["time"].apply(toTime)
-del btc
+btc_df["time"] = pd.to_datetime(btc_df["time"], utc=True)
+btc_df = btc_df.set_index("time")
 
 
 #%%
 # Merge btc and title df's into one
-sentdf = pd.merge(btc_df, dfpDay, on="time" ,how="inner")
+sentdf = pd.merge(btc_df, dfpDay, how="inner", left_index=True, right_index=True)
 
 #%%
 # Plot compound sentiment vs closing price
@@ -139,17 +146,11 @@ sentdf["delta_bool"] = sentdf["price_delta"].apply(lambda x: 1 if x >= 0 else 0)
 #%%
 rollSent = sentdf["com"].rolling(window=7).mean()
 sentdf["roll_com"] = rollSent
-sentdf.dropna()
 
 #%%
 # Plot rolling verses price
 sentdf.plot(figsize=(8, 5), y=["close",  "com"], secondary_y=["close"], mark_right=False, colormap='Paired')
 
-#%%
-# Add a price change variable to sentdf
-sentdf = sentdf.dropna()
-sentdf["price_delta"] = sentdf["close"] - sentdf["open"]
-sentdf["delta_bool"] = sentdf["price_delta"].apply(lambda x: 1 if x >= 0 else 0)
 
 #%%
 # Make Close price series statoinary
@@ -159,12 +160,6 @@ sentdf['close_log_diff'] = sentdf['close_log'] - sentdf['close_log'].shift(1)
 rollClose = sentdf["close_log_diff"].rolling(window=7).mean()
 sentdf["close_roll"] = rollClose
 sentdf = sentdf.dropna()
-sentdf = sentdf.set_index("time")
-
-#%%
-# Filter out for July #####################
-july = sentdf.index.map(lambda x: x.month) == 7
-sentJuly = sentdf[july]
 
 #%%
 # Plot rolling versus log difference
@@ -174,15 +169,15 @@ sentJuly = sentdf[july]
 #plotRoll.set_ylabel("Average sentiment")
 import matplotlib.pyplot as plt
 fig, ax1 = plt.subplots()
-sentJuly['close_roll'].plot(ax=ax1, alpha=0.0)
-sentJuly['roll_com'].plot(secondary_y=True, ax=ax1, alpha=0.0)
-ax = sentJuly['close_roll'].plot(color="#FF372A"); 
+sentdf['close_roll'].plot(ax=ax1, alpha=0.0)
+sentdf['roll_com'].plot(secondary_y=True, ax=ax1, alpha=0.0)
+ax = sentdf['close_roll'].plot(color="#FF372A"); 
 ax.set_ylabel('Rolling normalised BTC price difference', fontsize=10, color="#FF372A")
-sentJuly['roll_com'].plot(ax=ax, secondary_y=True, title="Weekly rolling average of hourly Reddit sentiment and BTC price difference." \
+sentdf['roll_com'].plot(ax=ax, secondary_y=True, title="Weekly rolling average of hourly Mainstream Media sentiment and BTC price difference." \
     ,color="#2AD8FF", figsize=(8, 5), alpha=0.8)
 plt.xlabel('Day', fontsize=10) 
-plt.ylabel('Rolling average of hourly Reddit sentiment', fontsize=10, rotation=-90, color="#2AD8FF")
-plt.savefig("output/RedSent_Hourly_vs_BTC_price_diff_ROLLED.png", dpi=300)
+plt.ylabel('Rolling average of hourly Mainstream Media sentiment', fontsize=10, rotation=-90, color="#2AD8FF")
+plt.savefig("output/Mainstream_Hourly_vs_BTC_price_diff_ROLLED.png", dpi=300)
 
 
 #%%
@@ -191,7 +186,7 @@ from sklearn.model_selection import train_test_split
 sentdf = sentdf[["com_clean", "delta_bool"]]
 #sentdf = sentdf[["pos", "neg" ,"neu", "delta_bool"]]
 # Split data
-X_train, X_test, y_sentdf, y_test = \
+X_train, X_test, y_train, y_test = \
 train_test_split(sentdf.drop("delta_bool", axis=1), sentdf["delta_bool"], test_size=0.3, random_state=322)
 
 #%%
@@ -206,3 +201,5 @@ rf_pred = clf.predict(X_test)
 print(classification_report(y_test, rf_pred))
 print(confusion_matrix(y_test, rf_pred))
 print("Accuracy:", accuracy_score(y_test,  rf_pred))
+
+#%%
