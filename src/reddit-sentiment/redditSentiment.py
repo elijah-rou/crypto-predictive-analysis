@@ -103,7 +103,8 @@ df = df.drop("com_bool", axis=1)
 # Add one hour to sentiment scores (want to predict if sentiment affects price 3 hour from now)
 from datetime import timedelta
 df_time = df.copy(deep=True)
-df_time["time"] = df_time["time"].apply(lambda x: x + timedelta(hours=2))
+#df_time["time"] = df_time["time"].apply(lambda x: x + timedelta(hours=0))
+df_time["time"] = df_time["time"].apply(lambda x: x + timedelta(days=1))
 
 #%%
 # Calculate mean scores per hour
@@ -132,7 +133,7 @@ sentdf = pd.merge(btc_df, dfpHour, on="time" ,how="inner")
 
 #%%
 # Plot compound sentiment vs closing price
-sentdf.plot(x="time", y=["close",  "com"], secondary_y=["com"], mark_right=False, colormap='Paired')
+sentdf.plot(x="time", y=["close",  "com"], secondary_y=["close"], mark_right=False, colormap='Paired')
 
 #%%
 # Add a price change variable to sentdf
@@ -141,13 +142,65 @@ sentdf["price_delta"] = sentdf["close"] - sentdf["open"]
 sentdf["delta_bool"] = sentdf["price_delta"].apply(lambda x: 1 if x >= 0 else 0)
 
 #%%
+# Plot stuff for July
+
+#%%
+rollSent = sentdf["com"].rolling(window=24).mean()
+sentdf["roll_com"] = rollSent
+sentdf.dropna()
+
+#%%
+# Plot rolling verses price
+sentdf.plot(figsize=(8, 5), y=["close",  "com"], secondary_y=["close"], mark_right=False, colormap='Paired')
+
+#%%
+# Add a price change variable to sentdf
+sentdf = sentdf.dropna()
+sentdf["price_delta"] = sentdf["close"] - sentdf["open"]
+sentdf["delta_bool"] = sentdf["price_delta"].apply(lambda x: 1 if x >= 0 else 0)
+
+#%%
+# Make Close price series statoinary
+import numpy as np
+sentdf["close_log"] = np.log(sentdf["close"])
+sentdf['close_log_diff'] = sentdf['close_log'] - sentdf['close_log'].shift(1)
+rollClose = sentdf["close_log_diff"].rolling(window=24).mean()
+sentdf["close_roll"] = rollClose
+sentdf = sentdf.dropna()
+sentdf = sentdf.set_index("time")
+
+#%%
+# Filter out for July #####################
+july = sentdf.index.map(lambda x: x.month) == 7
+sentJuly = sentdf[july]
+
+#%%
+# Plot rolling versus log difference
+#plotRoll = sentJuly.plot(x="time", y=["close_log_diff",  "roll_com"], secondary_y=["roll_com"], mark_right=False, colormap='Paired', \
+#    title="24 hour rolling average of sentiment and BTC closing price over July")
+#plotRoll.set_xlabel("Date")
+#plotRoll.set_ylabel("Average sentiment")
+import matplotlib.pyplot as plt
+fig, ax1 = plt.subplots()
+sentJuly['close_roll'].plot(ax=ax1, alpha=0.0)
+sentJuly['roll_com'].plot(secondary_y=True, ax=ax1, alpha=0.0)
+ax = sentJuly['close_roll'].plot(color="#FF372A"); 
+ax.set_ylabel('Rolling normalised BTC price difference', fontsize=10, color="#FF372A")
+sentJuly['roll_com'].plot(ax=ax, secondary_y=True, title="24 hour rolling average of hourly Reddit sentiment and BTC price difference over July." \
+    ,color="#2AD8FF", figsize=(8, 5), alpha=0.8)
+plt.xlabel('Day', fontsize=10) 
+plt.ylabel('Rolling average of hourly Reddit sentiment', fontsize=10, rotation=-90, color="#2AD8FF")
+plt.savefig("output/RedSent_Hourly_vs_BTC_price_diff_ROLLED.png", dpi=300)
+
+
+#%%
 from sklearn.model_selection import train_test_split
 # Remove unnecessary columns
-train = sentdf[["com", "delta_bool"]]
-#train = sentdf[["pos", "neg" ,"neu", "delta_bool"]]
+sentdf = sentdf[["com_clean", "delta_bool"]]
+#sentdf = sentdf[["pos", "neg" ,"neu", "delta_bool"]]
 # Split data
-X_train, X_test, y_train, y_test = \
-train_test_split(train.drop("delta_bool", axis=1), train["delta_bool"], test_size=0.3, random_state=322)
+X_train, X_test, y_sentdf, y_test = \
+train_test_split(sentdf.drop("delta_bool", axis=1), sentdf["delta_bool"], test_size=0.3, random_state=322)
 
 #%%
 from sklearn.ensemble import RandomForestClassifier
@@ -203,23 +256,51 @@ del btc
 sentDaydf = pd.merge(btc_df, dfpDay, on="time" ,how="inner")
 
 #%%
+rollSentDay = sentDaydf["com"].rolling(window=7).mean()
+sentDaydf["roll_com"] = rollSentDay
+sentDaydf = sentDaydf.dropna()
+
+
+#%%
 # Plot compound sentiment vs closing price
 sentDaydf.plot(x="time", y=["close",  "com"], secondary_y=["com"], mark_right=False, colormap='Paired')
 
 #%%
 # Add a price change variable to sentdf
-sentDaydf = sentdf.dropna()
+sentDaydf = sentDaydf.dropna()
 sentDaydf["price_delta"] = sentDaydf["close"] - sentDaydf["open"]
 sentDaydf["delta_bool"] = sentDaydf["price_delta"].apply(lambda x: 1 if x >= 0 else 0)
 
 #%%
-from sklearn.model_selection import train_test_split
+# Make Close price series statoinary
+import numpy as np
+sentDaydf["close_log"] = np.log(sentDaydf["close"])
+sentDaydf['close_log_diff'] = sentDaydf['close_log'] - sentDaydf['close_log'].shift(1)
+rollClose = sentDaydf["close_log_diff"].rolling(window=7).mean()
+sentDaydf["close_roll"] = rollClose
+sentDaydf = sentDaydf.dropna()
+
+#%%
+import matplotlib.pyplot as plt
+fig, ax1 = plt.subplots()
+sentDaydf['close_log_diff'].plot(ax=ax1)
+sentDaydf['roll_com'].plot(secondary_y=True, ax=ax1, alpha = 0.0)
+ax = sentDaydf['close_log_diff'].plot(color="#FF372A"); 
+ax.set_ylabel('Normalised BTC price difference', fontsize=10, color="#FF372A")
+sentDaydf['roll_com'].plot(ax=ax, secondary_y=True, title="Weekly rolling average of daily Reddit sentiment and BTC price difference from 08/18-08/19." \
+    ,color="#2AD8FF", figsize=(8, 5), alpha=0.7)
+plt.xlabel('Day', fontsize=10) 
+plt.ylabel('Rolling average of daily Reddit sentiment', fontsize=10, rotation=-90, color="#2AD8FF")
+plt.savefig("output/RedSent_daily_vs_BTC_price_diff.png", dpi=300)
+
+#%%
+from sklearn.model_selection import sentdf_test_split
 # Remove unnecessary columns
-train = sentDaydf[["com", "delta_bool"]]
-#train = sentdf[["pos", "neg" ,"neu", "delta_bool"]]
+sentdf = sentDaydf[["com", "delta_bool"]]
+#sentdf = sentdf[["pos", "neg" ,"neu", "delta_bool"]]
 # Split data
-X_train, X_test, y_train, y_test = \
-train_test_split(train.drop("delta_bool", axis=1), train["delta_bool"], test_size=0.3, random_state=322)
+X_sentdf, X_test, y_sentdf, y_test = \
+sentdf_test_split(sentdf.drop("delta_bool", axis=1), sentdf["delta_bool"], test_size=0.3, random_state=322)
 
 #%%
 from sklearn.ensemble import RandomForestClassifier
@@ -228,7 +309,7 @@ from sklearn.metrics import confusion_matrix
 from sklearn.metrics import accuracy_score
 # 86% - n(1000)/depth(5) || 71% - n(5000)/depth(9)
 clf = RandomForestClassifier(n_estimators = 5000, max_depth = 9, random_state = 0)
-clf.fit(X_train, y_train)
+clf.fit(X_sentdf, y_sentdf)
 rf_pred = clf.predict(X_test)
 print(classification_report(y_test, rf_pred))
 print(confusion_matrix(y_test, rf_pred))
@@ -249,5 +330,41 @@ for i in range(1, 180):
     if correlation[0] >= 0.1:
         print("Shift of " + str(i) + " days." + str(correlation))
 
+
+#%%
+############ Word cloud
+# Grab words
+posString = ""
+negString = ""
+# Grab positive and negative posts
+positive = df["com"] > 0
+negative = df["com"] < 0
+pos_titles = df[positive]
+neg_titles = df[negative]
+for k in pos_titles["title_clean"]:
+        posString = posString + " " + k
+for k in neg_titles["title_clean"]:
+        negString = negString + " " + k
+
+
+#%%
+def showWordcloud(cloud, filename):
+    plt.imshow(cloud)
+    plt.axis("off")
+    plt.savefig("output/"+filename+".png", dpi=300)
+    plt.show()
+# Generate Word Cloud
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
+wc = WordCloud(width=1920, height=1080)
+#%%
+# Positive word cloud
+posCloud = wc.generate(posString)
+showWordcloud(posCloud, "positive_cloud")
+
+#%%
+# Negative word cloud
+negCloud = wc.generate(negString)
+showWordcloud(negCloud, "negative_cloud")
 
 #%%
