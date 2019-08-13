@@ -8,6 +8,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 #%%
+# Import custom text/sentiment processor module for cleaning tweets
+import sys
+sys.path.append('src/data-processing')
+import textProcessor as tp
+import sentimentProcessor as sp
+
+#%%
 # Connect to MongoDB client
 from pymongo import MongoClient
 client = MongoClient("192.168.2.69", 27017)
