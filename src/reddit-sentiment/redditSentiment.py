@@ -1,4 +1,8 @@
+# Script using Python Interactive to explore relationship 
+# between Reddit sentiment and BTC price change
+
 #%%
+# Import Pandas
 import pandas as pd
 
 #%%
@@ -10,10 +14,12 @@ df = pd.merge(df_btc, df_BitCoin, how="outer")
 df = pd.merge(df, df_CryptoCurrency, how="outer")
 
 #%%
+# Merge all into one dataframe
 df = df[["score", "author", "title", "created_utc", "subreddit"]]
 del df_btc, df_BitCoin, df_CryptoCurrency
 
 #%%
+# Convert timestamps to datetime
 from datetime import datetime
 df["time"] = df["created_utc"].apply(datetime.fromtimestamp)
 df = df.drop("created_utc", axis=1)
@@ -21,6 +27,7 @@ df = df.drop("created_utc", axis=1)
 
 #%%
 # Clean reddit titles
+# Filter out non-English words and remove stopwords
 from nltk.corpus import stopwords
 from nltk.corpus import words
 import re
@@ -52,7 +59,6 @@ def spamFilter(tweetText):
             orderedWords.add(w)
             newText = newText + " " + w
     return newText[1:]
-
 df["title_clean"] = df["title"].apply(textCleaner)
 df["title_clean"] = df["title_clean"].apply(spamFilter)
 

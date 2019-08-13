@@ -1,3 +1,5 @@
+## Script using Python interactive to explore the relationship
+## between Twitter Sentiment and BTC price change
 #%%
 # Import pandas, math libraries and pprint
 import pandas as pd
