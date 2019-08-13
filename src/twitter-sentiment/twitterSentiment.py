@@ -1,53 +1,36 @@
-# Import necessary libraries
 #%%
-from pymongo import MongoClient
-import datetime
+# Import pandas, math libraries and pprint
 import pandas as pd
-import re
-import cryptocompare
 import pprint
-from datetime import datetime, timedelta
-import dateutil
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import mean_absolute_error
-from sklearn.metrics import mean_squared_error
-from sklearn.metrics import confusion_matrix
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
-from Levenshtein._levenshtein import distance 
 
-# Connect to MongoDB client
 #%%
+# Connect to MongoDB client
+from pymongo import MongoClient
 client = MongoClient("192.168.2.69", 27017)
 db = client["sentiment_data"]
 twitterData = db.twitter
 
-# Find all tweets stored on the 27th of July
 #%%
-docs = twitterData.find(
-{})
-
-# Convert to pandas dataframe
-#%%
+# Find all tweets stored & convert to dataframe
+docs = twitterData.find({})
 df = pd.DataFrame(list(docs))
 
-# Show first 10
 #%%
+# Show first 10
 df.head(1)
 
 #%%
-# Remove all tweets that have the same text
+# Remove all whitespace from tweets and drop those that have the same text (keeping the first)
+import re
 regex = re.compile("[^a-zA-Z]")
 df["text"] = df["text"].apply(lambda x: re.sub("\s\s+", " ", (regex.sub(" ", x))))
 df = df.drop_duplicates(subset = "text", keep = "first")
 df = df.drop_duplicates(subset="cleaned_text", keep = "first")
 
 #%%
-# Words to remove:
+# Remove tweets containing various strings (and Bigrams/Trigrams) from the data
 # #mpgvip #freebitcoin #livescore #makeyourownlane #footballcorn
 # #freethereum entertaining subscribe [free, bitcoin] [free, etheruem]
 # [current, price] [bitcoin, price] [earn, bitcoin] [start, trading, bitcoin]
@@ -76,17 +59,19 @@ df.drop(["flagged"], axis=1)
 # Select only necessary columns
 tweet_df = df[["time", "sentiment", "sentiment_clean"]]
 
-
 #%%
 # Get historical BTC price
-btc = cryptocompare.get_historical_price_hour("BTC", "USD", )
+from cryptocompare import get_historical_price_hour
+btc = get_historical_price_hour("BTC", "USD", )
 
 #%%
-# Create dataframe
+# Create dataframe for BTC price
+from dateutil.parser import parse
+from datetime import datetime 
 btc_df = pd.DataFrame.from_dict(btc["Data"])
 def toTime(unixTime):
     utcTime = str(datetime.utcfromtimestamp(unixTime))
-    return dateutil.parser.parse(utcTime[0:11]+" "+utcTime[11:20])
+    return parse(utcTime[0:11]+" "+utcTime[11:20])
 btc_df["time"] = btc_df["time"].apply(toTime)
 del btc
 
@@ -95,7 +80,7 @@ del btc
 # Process twitter df
 # Change time to datetime
 tweet_df["time"] = tweet_df["time"].apply(dateutil.parser.parse)
-# Extract vader sscore
+# Extract vader score
 tweet_df["neu"] = tweet_df["sentiment"].apply(lambda x: x["neu"])
 tweet_df["neu_clean"] = tweet_df["sentiment_clean"].apply(lambda x: x["neu"])
 tweet_df["pos"] = tweet_df["sentiment"].apply(lambda x: x["pos"])
@@ -111,7 +96,7 @@ tweet_df = tweet_df.drop("sentiment", axis =1)
 tweet_df = tweet_df.drop("sentiment_clean", axis =1)
 
 #%%
-# Filter out all "neutral" tweets (Vader Com > +- 0.5)
+# Filter out all "neutral" tweets (Absolute Vader combined score > 0.5)
 def sentimentThreshold(sentiment):
     if (sentiment > 0.5):
         return 1
@@ -127,19 +112,16 @@ tweet_df = tweet_df[tweet_df["com_bool"] <= 1]
 tweetpHour_df = tweet_df.resample("H", on="time").mean()
 
 #%%
-#processed = tweetpHour_df[["com"]]
-
-#%%
+# Function to calculate the change in sentiment from previous value in row
 def sentimentDelta(row):
     if (row.shift(1)["com"].isnull()):
         row["sent_delta"] = 0
     else:
         row["sent_delta"] = row["com"]= row.shift(1)["com"]
 
-#processed["sent_delta"] = processed.apply(sentimentDelta)
 
 #%%
-# Calculate pearson correlation for different shifts
+# Calculate pearson correlation for different shifts on sentiment
 from scipy.stats import pearsonr
 from datetime import timedelta
 from scipy.stats import pearsonr
@@ -155,43 +137,18 @@ for i in range(1, 12):
     print("Shift of " + str(i) + " hours." + str(correlation))
 
 #%%
-# Add 3 hours to sentiment scores (want to predict if sentiment affects price 3 hour from now)
+# Add 3 hours to sentiment scores (want to predict if sentiment affects price 3 hours from now)
 tweetpHour_df.index = tweetpHour_df.index + pd.DateOffset(3)
 
 #%%
 # Merge dataframes
 sentdf = pd.merge(tweetpHour_df, btc_df, on="time", how="inner")
 
-
-#%%
-# Filter for only continuous data
-sentdf = sentdf.iloc[10:]
-sentdf = sentdf.iloc[100:]
-sentdf = sentdf.set_index("time")
-
-#%%
-sentdf.plot(y=["close",  "com"], secondary_y=["com"], mark_right=False, colormap='Paired')
-
-#%%
-import matplotlib.pyplot as plt
-fig, ax1 = plt.subplots()
-sentdf['close'].plot(ax=ax1, alpha=0.0)
-sentdf['com'].plot(secondary_y=True, ax=ax1, alpha=0.0)
-ax = sentdf['close'].plot(color="#FF372A"); 
-ax.set_ylabel('BTC closing price (USD $)', fontsize=10, color="#FF372A")
-sentdf['com'].plot(ax=ax, secondary_y=True, title="Average hourly Twitter sentiment and BTC closing price from 29/07-08/08." \
-    ,color="#2AD8FF", figsize=(10, 7), alpha=0.8)
-plt.xlabel('Day', fontsize=10) 
-plt.ylabel('Average Twitter sentiment', fontsize=10, rotation=-90, color="#2AD8FF")
-plt.savefig("output/Twitter_Hourly_vs_BTC_price_closing.png", dpi=300)
-
 #%%
 # Add a price change variable to sentdf
 sentdf = sentdf.dropna()
 sentdf["price_delta"] = sentdf["close"] - sentdf["open"]
 sentdf["delta_bool"] = sentdf["price_delta"].apply(lambda x: 1 if x >= 0 else 0)
-
-#%%
 p_change = sentdf["com"].pct_change(1)
 p_change = p_change.apply(lambda x: 1 if x > 0 else 0)
 sentdf["com_change"] = p_change
@@ -199,12 +156,16 @@ sentdf["com_change"] = p_change
 #%%
 # Remove unnecessary columns
 train = sentdf[["com", "delta_bool"]]
-#train = sentdf[["pos", "neg" ,"neu", "delta_bool"]]
 # Split data
+from sklearn.model_selection import train_test_split
 X_train, X_test, y_train, y_test = \
 train_test_split(train.drop("delta_bool", axis=1), train["delta_bool"], test_size=0.3, random_state=322)
 
 #%%
+# Run a Random Forest Classifier 
+from sklearn.metrics import classification_report
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import confusion_matrix
 from sklearn.ensemble import RandomForestClassifier
 # 86% - n(1000)/depth(5) || 71% - n(5000)/depth(9)
 clf = RandomForestClassifier(n_estimators = 5000, max_depth = 9, random_state = 0)
@@ -215,6 +176,3 @@ print(confusion_matrix(y_test, rf_pred))
 print("Accuracy:", accuracy_score(y_test,  rf_pred))
 
 
-
-
-#%%
