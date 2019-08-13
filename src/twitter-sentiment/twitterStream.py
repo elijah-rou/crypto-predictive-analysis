@@ -8,13 +8,6 @@ import json
 from tweepy.streaming import StreamListener
 from tweepy import OAuthHandler
 from tweepy import Stream
-# Regular Expression
-import re
-# Natural Language Tool Kit
-import nltk
-from nltk.corpus import stopwords
-from nltk.corpus import words
-from nltk.tokenize import word_tokenize
 # MongoDB Library
 from pymongo import MongoClient
 # Python thread class
@@ -23,8 +16,6 @@ from threading import Thread
 from time import sleep
 # Time for logging
 import datetime
-# Botometer for bot detection
-#import botometer
 # Vader for Sentiment analysis
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 # Tenacity
@@ -37,31 +28,27 @@ import urllib3
 import requests
 # Queue
 from queue import Queue
+# Import custom text processor module for cleaning tweets
+import sys
+sys.path.append('src/data-processing')
+import textProcessor as tp
 
 # Constants
 keywords = ["bitcoin", "ethereum", "cryptocurrency", "btc", "crypto", "eth", "blockchain", "bitcoin+news", "crypto+news", "hodl", "bitcoin+fud",
 "#bitcoin", "#bitcoinnews", "#cryptonews", "#crypto"]
 # cryptonews, bitcoin, bitcoinmining, hodl, sell bitcion, buy bitcoin, bitcoin whale, bitcoin moooning
-stopWords = set(stopwords.words("english"))
-engCorpus = set(words.words())
 
-# MongoDB @ 192.168.2.69:27017
-client = MongoClient("192.168.2.69", 27017)
-db = client["sentiment_data"]
-twitterData = db.twitter
-twitterUsers = db.twitter_users
+# Load configuration file for the database and connect
+with open("config/database_config.cfg", "r") as f:
+    client_config = json.load(f)
+client = MongoClient(client_config["ip"], client_config["port"])
+db = client[client_config["database"]]
+twitterData = db[client_config["twitter_documents"]]
+twitterUsers = db[client_config["twitter_users"]]
 
-# Define access tokens & user credentials used for access
-twitterAuth = {
-    "consumer_key" : "LIrUnrnifiXrTaiuTmalM30Pd",
-    "consumer_secret": "iH9hlwQvrdzKhkwd1RzSiAhEUjnRltgYihR1n5YPO6FkOY81k9",
-    "access_token" : "1152134174108782592-qEFou1vhM61EI4tnUjzZRNsfeq8Enq",
-    "access_secret" : "89d5n5V0mviJeJyXdKirjKTLDKVAa6hbeKbUuM3SXX9Yq"
-}
-
-# Botometer API key
-#botAPIKey = "cd3f38366emshdd2cd0a2a5cca9ep14172djsn5f6c4df5a085"
-#bom = botometer.Botometer(wait_on_rate_limit = True, mashape_key = botAPIKey, **twitterAuth)
+# Load Twitter access tokens & user credentials from config file
+with open("config/twitter_authentication.cfg", "r") as f:
+    twitterAuth = json.load(f)
 
 # Vader analyser
 analyzer = SentimentIntensityAnalyzer()
@@ -69,73 +56,69 @@ analyzer = SentimentIntensityAnalyzer()
 # Logging configuration
 logging.basicConfig(level=logging.INFO, filename="logs/twitter_stream.log", filemode="a", format="%(levelname)s - %(asctime)s - %(message)s")
 
-
 # Functions
-# Function to clean tweet text (Remove whitespace, convert to lowercase, remove non-alphabetic characters)
-def textCleaner(tweetText):
-    # Convert text to lowercase
-    newText = tweetText.lower()
+# Function to remove unnecessary key-store values from tweets
+def cleanTweet(tweet):
+    # Refactor important values
+    tweet["tweet_id"] = tweet.pop("id")
 
-    # Strip whitespace from text
-    newText = newText.strip()
-
-    # Remove all non-alphabetic characters using regular expression
-    regex = re.compile("[^a-zA-Z]")
-    newText = regex.sub(" ", newText)
+    # Remove unecessary attributes
+    tweet.pop("id_str")
+    tweet.pop("in_reply_to_status_id")
+    tweet.pop("in_reply_to_user_id_str")
+    tweet.pop("in_reply_to_user_id")
+    if "display_text_range" in tweet:
+        tweet.pop("display_text_range")
+    tweet.pop("coordinates")
+    tweet.pop("contributors")
+    tweet.pop("in_reply_to_status_id_str")
+    tweet.pop("source")
+    tweet.pop("place")
+    tweet.pop("geo")
+    tweet.pop("truncated")
+    tweet.pop("in_reply_to_screen_name")
+    tweet.pop("is_quote_status")
+    tweet.pop("lang")
+    if "extended_entities" in tweet:
+        tweet.pop("extended_entities")
     
-    return newText
+    # From "entities" key
+    if "entities" in tweet:
+        tweet.pop("entities")
 
+    # From "user" key
+    tweet["user"].pop("default_profile")
+    tweet["user"].pop("profile_background_tile")
+    tweet["user"].pop("following")
+    tweet["user"].pop("name")
+    tweet["user"].pop("description")
+    tweet["user"].pop("profile_sidebar_border_color")
+    tweet["user"].pop("utc_offset")
+    tweet["user"].pop("notifications")
+    tweet["user"].pop("profile_background_image_url")
+    tweet["user"].pop("profile_image_url")
+    tweet["user"].pop("profile_image_url_https")
+    tweet["user"].pop("follow_request_sent")
+    tweet["user"].pop("url")
+    tweet["user"].pop("profile_link_color")
+    tweet["user"].pop("profile_text_color")
+    if "profile_banner_url" in tweet["user"]:
+        tweet["user"].pop("profile_banner_url")
+    tweet["user"].pop("profile_sidebar_fill_color")
+    tweet["user"].pop("profile_background_color")
+    tweet["user"].pop("time_zone")
+    tweet["user"].pop("lang")
+    tweet["user"].pop("contributors_enabled")
+    tweet["user"].pop("is_translator")
+    tweet["user"].pop("profile_background_image_url_https")
+    tweet["user"].pop("profile_use_background_image")
 
-# Function to filter text for spam, duplicates and nonsense
-def spamFilter(tweetText):
-    # Use NLTK to remove non-english words and stop-words
-    words = tweetText.split()
-    newText = ""
-    orderedWords = set()
-
-    # Check if the word is a duplicate, and a stop word or a proper word
-    for w in words:
-        if (w not in orderedWords) and (w not in stopWords) and (w in engCorpus) and (len(w) > 1):
-            orderedWords.add(w)
-            newText = newText + " " + w
-    return newText[1:]
-
-# Function that queries the botometer api to return a score
-# of how likely the account is to be a bot
-def botCheck(username_id):
-    result = bom.check_account("username_id")
-    score = result["scores"]["english"]
-    # False if likely to be human
-    if(score > 0.3):
-        return False
-    else:
-        return True
-
-# Dictionary used to convert a month string JAN/FEB etc. to a number
-monthNum ={
-    "Jan" : "01",
-    "Feb" : "02",
-    "Mar" : "03",
-    "Apr" : "04",
-    "May" : "05",
-    "Jun" : "06",
-    "Jul" : "07",
-    "Aug" : "08",
-    "Sep" : "09",
-    "Oct" : "10",
-    "Nov" : "11",
-    "Dec" : "12"
-}
-
-# Used to convert a twitter created_at value to a UTC timestamp
-def toTimestamp(date):
-    timestamp = date[-4:]+"-"
-    timestamp += monthNum[date[4:7]]+"-"+date[8:10]+" "
-    timestamp += date[11:19]
-    return(timestamp)
-
-
-
+    if "entities" in tweet["user"]:
+        tweet["user"].pop("entities")
+    
+    return tweet
+    
+    
 # Function that cleans a tweet and stores it in a MongoDB database
 def cleanAndStore(data):
     # Load data into JSON
@@ -155,85 +138,27 @@ def cleanAndStore(data):
             text = tweet["text"]
 
         # Clean and Filter data from tweet
-        text = textCleaner(text)
-        text = spamFilter(text)
-
+        text = tp.textCleaner(text)
+        text = tp.spamFilter(text)
+        
         # If meaningful -> Continue with processing
         if text != '':
-            # Refactor important values
-            tweet["tweet_id"] = tweet.pop("id")
-
-            # Remove unecessary attributes
-            tweet.pop("id_str")
-            tweet.pop("in_reply_to_status_id")
-            tweet.pop("in_reply_to_user_id_str")
-            tweet.pop("in_reply_to_user_id")
-            if "display_text_range" in tweet:
-                tweet.pop("display_text_range")
-            tweet.pop("coordinates")
-            tweet.pop("contributors")
-            tweet.pop("in_reply_to_status_id_str")
-            tweet.pop("source")
-            tweet.pop("place")
-            tweet.pop("geo")
-            tweet.pop("truncated")
-            tweet.pop("in_reply_to_screen_name")
-            tweet.pop("is_quote_status")
-            tweet.pop("lang")
-            if "extended_entities" in tweet:
-                tweet.pop("extended_entities")
-            
-            # From "entities" key
-            if "entities" in tweet:
-                tweet.pop("entities")
-
-            # From "user" key
-            tweet["user"].pop("default_profile")
-            tweet["user"].pop("profile_background_tile")
-            tweet["user"].pop("following")
-            tweet["user"].pop("name")
-            tweet["user"].pop("description")
-            tweet["user"].pop("profile_sidebar_border_color")
-            tweet["user"].pop("utc_offset")
-            tweet["user"].pop("notifications")
-            tweet["user"].pop("profile_background_image_url")
-            tweet["user"].pop("profile_image_url")
-            tweet["user"].pop("profile_image_url_https")
-            tweet["user"].pop("follow_request_sent")
-            tweet["user"].pop("url")
-            tweet["user"].pop("profile_link_color")
-            tweet["user"].pop("profile_text_color")
-            if "profile_banner_url" in tweet["user"]:
-                tweet["user"].pop("profile_banner_url")
-            tweet["user"].pop("profile_sidebar_fill_color")
-            tweet["user"].pop("profile_background_color")
-            tweet["user"].pop("time_zone")
-            tweet["user"].pop("lang")
-            tweet["user"].pop("contributors_enabled")
-            tweet["user"].pop("is_translator")
-            tweet["user"].pop("profile_background_image_url_https")
-            tweet["user"].pop("profile_use_background_image")
-            
-
-            if "entities" in tweet["user"]:
-                tweet["user"].pop("entities")
-            
+            tweet = cleanTweet(tweet)
             # Add cleaned tweet data
             tweet["cleaned_text"] = text
-
             # Reformat created_at key-value to a workable timestamp
             tweet["time"] = toTimestamp(tweet["created_at"])
-
             # Store the sentiment score calculated by Vader
             tweet["sentiment"] = analyzer.polarity_scores(tweet["text"])
             tweet["sentiment_clean"] = analyzer.polarity_scores(tweet["cleaned_text"]) 
-
-            # Save tweet & update user
+            # Update the user database with the associate user 
             user = tweet["user"]
             user.pop("id_str")
             user.pop("translator_type")
             user["time"] = toTimestamp(user["created_at"])
             twitterUsers.update_one({"id": user["id"]},{"$set": user}, upsert  = True)
+
+            # Save the cleaned tweet in the database
             result = twitterData.insert_one(tweet)
             print(id + ' POSTED as {0}'.format(result.inserted_id))
             print(str(datetime.datetime.now()) + ": " + id + ' POSTED as {0}'.format(result.inserted_id)) 
@@ -243,7 +168,6 @@ def cleanAndStore(data):
 # Classes
 # override tweepy.StreamListener
 class BitcoinListener(StreamListener):
-
     def __init__(self, q=Queue()):
         # Create 4 threads that will handle tweet cleaning
         self.q = q
@@ -285,8 +209,8 @@ class BitcoinListener(StreamListener):
         logging.critical("Stream error")
         print(str(datetime.datetime.now()) + ": STREAM ERROR - check log")
         logging.critical(str(exception))
-        #raise exception
     
+    # Function for threads to continually check the queue and clean tweets
     def cleanTweets(self):
         while True:
             cleanAndStore(self.q.get())
@@ -303,16 +227,16 @@ def tenacityStream(stream):
 
 # Main Function
 def main():
+    # Log stream start
     logging.info("Stream started")
     # Set up a stream listener
     btcListener = BitcoinListener()
-
     # Set up stream
     authentication = OAuthHandler(twitterAuth["consumer_key"], twitterAuth["consumer_secret"])
     authentication.set_access_token(twitterAuth["access_token"], twitterAuth["access_secret"])
     stream = Stream(authentication, btcListener, tweet_mode = "extended")
 
-    # Filter stream by keywords
+    # Filter stream by keywords, log errors
     while True:
         try:
             logging.info("Started run")
