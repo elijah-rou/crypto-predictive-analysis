@@ -7,3 +7,4 @@
 *.json
 /data/btc*
 *.png
+config/
