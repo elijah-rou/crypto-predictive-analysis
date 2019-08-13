@@ -1,3 +1,5 @@
+# Script to update the user database with bot scores
+# Necessary imports
 import botometer
 from pymongo import MongoClient
 import pprint
