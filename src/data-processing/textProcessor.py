@@ -62,3 +62,8 @@ def toTimestamp(date):
     timestamp += monthNum[date[4:7]]+"-"+date[8:10]+" "
     timestamp += date[11:19]
     return(timestamp)
+
+# Function to convert a unix timestamp to a normal timestamp
+def toTime(unixTime):
+    utcTime = str(datetime.utcfromtimestamp(unixTime))
+    return parser.parse(utcTime[0:11]+" "+utcTime[11:20])
