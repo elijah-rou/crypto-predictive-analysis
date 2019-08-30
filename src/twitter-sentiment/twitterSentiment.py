@@ -32,9 +32,7 @@ df.head(1)
 
 #%%
 # Remove all whitespace from tweets and drop those that have the same text (keeping the first)
-import re
-regex = re.compile("[^a-zA-Z]")
-df["text"] = df["text"].apply(lambda x: re.sub("\s\s+", " ", (regex.sub(" ", x))))
+df["text"] = df["text"].apply(tp.textCleaner)
 df = df.drop_duplicates(subset = "text", keep = "first")
 df = df.drop_duplicates(subset="cleaned_text", keep = "first")
 
@@ -60,7 +58,7 @@ def wordChecker(string):
         return True
     else:
         return False
-df["flagged"] = wordChecker(df["text"])
+df["flagged"] = sp.wordChecker(df["text"])
 df = df[~df["flagged"]]
 df.drop(["flagged"], axis=1)
 
@@ -78,10 +76,7 @@ btc = get_historical_price_hour("BTC", "USD", )
 from dateutil.parser import parse
 from datetime import datetime 
 btc_df = pd.DataFrame.from_dict(btc["Data"])
-def toTime(unixTime):
-    utcTime = str(datetime.utcfromtimestamp(unixTime))
-    return parse(utcTime[0:11]+" "+utcTime[11:20])
-btc_df["time"] = btc_df["time"].apply(toTime)
+btc_df["time"] = btc_df["time"].apply(tp.toTime)
 del btc
 
 
@@ -106,28 +101,12 @@ tweet_df = tweet_df.drop("sentiment_clean", axis =1)
 
 #%%
 # Filter out all "neutral" tweets (Absolute Vader combined score > 0.5)
-def sentimentThreshold(sentiment):
-    if (sentiment > 0.5):
-        return 1
-    elif (sentiment < -0.5):
-        return 0
-    else:
-        return 2
-tweet_df["com_bool"] = tweet_df["com"].apply(sentimentThreshold)
+tweet_df["com_bool"] = tweet_df["com"].apply(sp.sentimentThreshold)
 tweet_df = tweet_df[tweet_df["com_bool"] <= 1]
 
 #%%
 # Calculate mean scores per hour
 tweetpHour_df = tweet_df.resample("H", on="time").mean()
-
-#%%
-# Function to calculate the change in sentiment from previous value in row
-def sentimentDelta(row):
-    if (row.shift(1)["com"].isnull()):
-        row["sent_delta"] = 0
-    else:
-        row["sent_delta"] = row["com"]= row.shift(1)["com"]
-
 
 #%%
 # Calculate pearson correlation for different shifts on sentiment

@@ -6,6 +6,12 @@
 import pandas as pd
 
 #%%
+# Import custom text/sentiment processor module for cleaning tweets
+import sys
+sys.path.append('src/data-processing')
+import textProcessor as tp
+import sentimentProcessor as sp
+#%%
 # Read in reddit data
 df_btc = pd.read_csv("data/reddit/btcSubreddit.csv")
 df_BitCoin = pd.read_csv("data/reddit/BitCoinSubreddit.csv")
@@ -24,50 +30,15 @@ from datetime import datetime
 df["time"] = df["created_utc"].apply(datetime.fromtimestamp)
 df = df.drop("created_utc", axis=1)
 
-
 #%%
-# Clean reddit titles
-# Filter out non-English words and remove stopwords
-from nltk.corpus import stopwords
-from nltk.corpus import words
-import re
-stopWords = set(stopwords.words("english"))
-engCorpus = set(words.words())
 # Function to clean tweet text (Remove whitespace, convert to lowercase, remove non-alphabetic characters)
-def textCleaner(tweetText):
-    # Convert text to lowercase
-    newText = tweetText.lower()
-
-    # Strip whitespace from text
-    newText = newText.strip()
-
-    # Remove all non-alphabetic characters using regular expression
-    regex = re.compile("[^a-zA-Z]")
-    newText = regex.sub(" ", newText)
-    
-    return newText
-# Function to filter text for spam, duplicates and nonsense
-def spamFilter(tweetText):
-    # Use NLTK to remove non-english words and stop-words
-    words = tweetText.split()
-    newText = ""
-    orderedWords = set()
-
-    # Check if the word is a duplicate, and a stop word or a proper word
-    for w in words:
-        if (w not in orderedWords) and (w not in stopWords) and (w in engCorpus) and (len(w) > 1):
-            orderedWords.add(w)
-            newText = newText + " " + w
-    return newText[1:]
-df["title_clean"] = df["title"].apply(textCleaner)
-df["title_clean"] = df["title_clean"].apply(spamFilter)
-
+df["title_clean"] = df["title"].apply(tp.textCleaner)
+df["title_clean"] = df["title_clean"].apply(tp.spamFilter)
 
 #%%
 # Filter post for duplicates and duplicates on cleaned text
 df = df.drop_duplicates(subset="title", keep="first")
 df = df.drop_duplicates(subset="title_clean", keep="first")
-
 
 #%%
 # Calculate vader scores for each title
@@ -92,14 +63,7 @@ df = df.drop("sentiment_clean", axis=1)
 
 #%%
 # Remove all posts which are neutral according to Vader recommended threshold
-def sentimentThreshold(sentiment):
-    if (sentiment > 0.5):
-        return 1
-    elif (sentiment < -0.5):
-        return 0
-    else:
-        return 2
-df["com_bool"] = df["com"].apply(sentimentThreshold)
+df["com_bool"] = df["com"].apply(sp.sentimentThreshold)
 df = df[df["com_bool"] <= 1]
 df = df.drop("com_bool", axis=1)
 
@@ -126,12 +90,8 @@ btc = get_historical_price_hour("BTC", "USD", )
 # Create dataframe
 from dateutil import parser
 btc_df = pd.DataFrame.from_dict(btc["Data"])
-def toTime(unixTime):
-    utcTime = str(datetime.utcfromtimestamp(unixTime))
-    return parser.parse(utcTime[0:11]+" "+utcTime[11:20])
-btc_df["time"] = btc_df["time"].apply(toTime)
+btc_df["time"] = btc_df["time"].apply(tp.toTime)
 del btc
-
 
 #%%
 # Merge btc and title df's into one
@@ -148,15 +108,13 @@ sentdf["price_delta"] = sentdf["close"] - sentdf["open"]
 sentdf["delta_bool"] = sentdf["price_delta"].apply(lambda x: 1 if x >= 0 else 0)
 
 #%%
-# Plot stuff for July
-
-#%%
+# Calculate rolling sentiment for a 24 hour window
 rollSent = sentdf["com"].rolling(window=24).mean()
 sentdf["roll_com"] = rollSent
 sentdf.dropna()
 
 #%%
-# Plot rolling verses price
+# Plot rolling sentiment verses price
 sentdf.plot(figsize=(8, 5), y=["close",  "com"], secondary_y=["close"], mark_right=False, colormap='Paired')
 
 #%%
@@ -323,8 +281,6 @@ print("Accuracy:", accuracy_score(y_test,  rf_pred))
 
 #%%
 # Calculate pearson correlation for different shifts
-from scipy.stats import pearsonr
-from datetime import timedelta
 testdf = dfpDay.copy(deep=True)
 for i in range(1, 180):
     # Merge btc and title df's into one
